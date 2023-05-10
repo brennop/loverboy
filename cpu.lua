@@ -54,8 +54,8 @@ function cpu:step()
   local opcode = memory:get(self.pc)
   local instruction = instructions[opcode]
 
-  if instruction == nil then
-    print(string.format("unknown instruction: 0x%02x at PC:0x%04x", opcode, self.pc))
+  if instruction.handler == nil then
+    print(string.format("unknown instruction: 0x%02x, %s at PC:0x%04x", opcode, instruction.mnemonic, self.pc))
     os.exit(1)
   end
 
