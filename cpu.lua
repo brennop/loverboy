@@ -1,5 +1,5 @@
-local memory = require "memory"
 local instructions = require "instructions"
+local memory = nil
 
 local cpu = {
   -- registers
@@ -21,7 +21,7 @@ local cpu = {
   memory = nil,
 }
 
-function cpu:init()
+function cpu:init(_memory)
   self.pc = 0x0100
   self.sp = 0xfffe
 
@@ -33,6 +33,8 @@ function cpu:init()
   self.e = 0xd8
   self.h = 0x01
   self.l = 0x4d
+
+  memory = _memory
 end
 
 function cpu:step()
@@ -46,14 +48,8 @@ function cpu:step()
 
   self.pc = self.pc + instruction.bytes
 
-  local cycles = instruction.cycles
-
-  -- set some values
-  cpu.hl = memory:get(bor(lshift(t.h, 8), t.l))
-
-  if instruction.handler(unpack(instruction.params)) then
-    cycles = cycles + 4 -- TODO: increment right
-  end
+  local extra_cycles = instruction.handler(instruction.params) or 0
+  local cycles = instruction.cycles + extra_cycles
 
   return cycles
 end

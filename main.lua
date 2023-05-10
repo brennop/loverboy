@@ -6,7 +6,7 @@ local instructions = require "instructions"
 function love.load()
   emulator:init("tetris.gb")
   memory:init(emulator.rom)
-  cpu:init()
+  cpu:init(memory)
   instructions:init(cpu, memory)
 end
 
