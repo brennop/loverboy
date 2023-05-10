@@ -11,9 +11,12 @@ for i = 0, 0x10000 do memory.data[i] = 0 end
 function memory:get(addr) return self.data[addr] end
 function memory:set(addr, value) self.data[addr] = value end
 
+local testfolder = "cpu_tests/"
 local testsuite = arg[1]
+local filepath = testfolder .. testsuite .. ".json"
+print(filepath)
 
-local file = io.open(testsuite, "r")
+local file = io.open(filepath, "r")
 local data = file:read "*all"
 file:close()
 
@@ -121,8 +124,13 @@ local function run_tests(tests)
     local ok, err = pcall(run_test, test)
 
     if not ok then
-      print(err)
+      print(err, "at ", test.name)
       errors = errors + 1
+    end
+
+    if errors >= 10 then
+      print("too many errors, stopping")
+      os.exit(1)
     end
   end
 

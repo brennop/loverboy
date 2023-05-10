@@ -1,6 +1,8 @@
 local instructions = require "instructions"
 local memory = nil
 
+local bor, lshift = bit.bor, bit.lshift
+
 local cpu = {
   -- registers
   a = 0,
@@ -21,6 +23,12 @@ local cpu = {
   memory = nil,
 }
 
+local index = {
+  ["(hl)"] = function(self)
+    return memory:get(bor(lshift(self.h, 8), self.l))
+  end
+}
+
 function cpu:init(_memory)
   self.pc = 0x0100
   self.sp = 0xfffe
@@ -35,7 +43,12 @@ function cpu:init(_memory)
   self.l = 0x4d
 
   memory = _memory
+
+  setmetatable(self, {
+    __index = function(tbl, key) return index[key](tbl) end,
+  })
 end
+
 
 function cpu:step()
   local opcode = memory:get(self.pc)

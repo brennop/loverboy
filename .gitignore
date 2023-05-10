@@ -2,3 +2,4 @@
 *.log
 
 json.lua
+cpu_tests/
