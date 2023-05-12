@@ -26,6 +26,12 @@ local cpu = {
 local index = {
   ["(hl)"] = function(self)
     return memory:get(bor(lshift(self.h, 8), self.l))
+  end,
+}
+
+local newindex = {
+  ["(hl)"] = function(self, value)
+    memory:set(bor(lshift(self.h, 8), self.l), value)
   end
 }
 
@@ -46,9 +52,11 @@ function cpu:init(_memory)
 
   setmetatable(self, {
     __index = function(tbl, key) return index[key](tbl) end,
+    __newindex = function(table, key, value)
+      newindex[key](table, value)
+    end
   })
 end
-
 
 function cpu:step()
   local opcode = memory:get(self.pc)

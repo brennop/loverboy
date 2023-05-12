@@ -19,4 +19,10 @@ function memory:get(address)
   return self.data[address]
 end
 
+function memory:set(address, value)
+  local range = rshift(address, 12)
+
+  self.data[address] = value
+end
+
 return memory

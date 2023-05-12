@@ -2,9 +2,13 @@ local cpu = nil
 local memory = nil
 
 local rshift, lshift, rol = bit.rshift, bit.lshift, bit.rol
-local band, bor, bxor = bit.band, bit.bor, bit.bxor
+local band, bor, bxor, bnot = bit.band, bit.bor, bit.bxor, bit.bnot
 
 local instructions = {}
+
+local function compose(high, low)
+  return bor(lshift(high, 0x8), low)
+end
 
 local function nnn()
 	return bor(lshift(memory:get(cpu.pc - 1), 0x8), memory:get(cpu.pc - 2))
@@ -37,6 +41,32 @@ local function xor_a_r8(register)
 	cpu.f = cpu.a == 0 and 0x80 or 0
 end
 
+local function ld_r8_nn(register)
+  cpu[register] = memory:get(cpu.pc - 1)
+end
+
+local function ld_hl_nn()
+  memory:set(compose(cpu.h, cpu.l), memory:get(cpu.pc - 1))
+end
+
+local function ld_hl_a(inc)
+  local hl = compose(cpu.h, cpu.l)
+  memory:set(hl, cpu.a)
+  cpu.h = band(rshift(hl + inc, 0x8), 0xff)
+  cpu.l = band(hl + inc, 0xff)
+end
+
+local function dec_r8(register)
+  local result = band(cpu[register] - 1, 0xff)
+
+  cpu[register] = result
+
+  cpu.f = bor(result == 0 and 0x80 or 0,
+              0x40,
+              band(result, 0xf) == 0xf and 0x20 or 0,
+              band(cpu.f, 0x10))
+end
+
 -- [[
 -- End Instruction handlers
 -- ]]
@@ -47,64 +77,64 @@ local lookup = {
   { 0x02, "LD BC, A",     1, 8,  nil,        nil },
   { 0x03, "INC BC",       1, 8,  nil,        nil },
   { 0x04, "INC B",        1, 4,  nil,        nil },
-  { 0x05, "DEC B",        1, 4,  nil,        nil },
-  { 0x06, "LD B, d8",     2, 8,  nil,        nil },
+  { 0x05, "DEC B",        1, 4,  dec_r8,     "b" },
+  { 0x06, "LD B, d8",     2, 8,  ld_r8_nn,   "b" },
   { 0x07, "RLCA ",        1, 4,  nil,        nil },
   { 0x08, "LD a16, SP",   3, 20, nil,        nil },
   { 0x09, "ADD HL, BC",   1, 8,  nil,        nil },
   { 0x0A, "LD A, BC",     1, 8,  nil,        nil },
   { 0x0B, "DEC BC",       1, 8,  nil,        nil },
   { 0x0C, "INC C",        1, 4,  nil,        nil },
-  { 0x0D, "DEC C",        1, 4,  nil,        nil },
-  { 0x0E, "LD C, d8",     2, 8,  nil,        nil },
+  { 0x0D, "DEC C",        1, 4,  dec_r8,     "c" },
+  { 0x0E, "LD C, d8",     2, 8,  ld_r8_nn,   "c" },
   { 0x0F, "RRCA ",        1, 4,  nil,        nil },
   { 0x10, "STOP d8",      2, 4,  nil,        nil },
   { 0x11, "LD DE, d16",   3, 12, ld_r16_d16, { "d",    "e" } },
   { 0x12, "LD DE, A",     1, 8,  nil,        nil },
   { 0x13, "INC DE",       1, 8,  nil,        nil },
   { 0x14, "INC D",        1, 4,  nil,        nil },
-  { 0x15, "DEC D",        1, 4,  nil,        nil },
-  { 0x16, "LD D, d8",     2, 8,  nil,        nil },
+  { 0x15, "DEC D",        1, 4,  dec_r8,     "d" },
+  { 0x16, "LD D, d8",     2, 8,  ld_r8_nn,   "d" },
   { 0x17, "RLA ",         1, 4,  nil,        nil },
   { 0x18, "JR r8",        2, 12, nil,        nil },
   { 0x19, "ADD HL, DE",   1, 8,  nil,        nil },
   { 0x1A, "LD A, DE",     1, 8,  nil,        nil },
   { 0x1B, "DEC DE",       1, 8,  nil,        nil },
   { 0x1C, "INC E",        1, 4,  nil,        nil },
-  { 0x1D, "DEC E",        1, 4,  nil,        nil },
-  { 0x1E, "LD E, d8",     2, 8,  nil,        nil },
+  { 0x1D, "DEC E",        1, 4,  dec_r8,     "e" },
+  { 0x1E, "LD E, d8",     2, 8,  ld_r8_nn,   "e" },
   { 0x1F, "RRA ",         1, 4,  nil,        nil },
   { 0x20, "JR NZ, r8",    2, 12, nil,        nil },
   { 0x21, "LD HL, d16",   3, 12, ld_r16_d16, { "h",    "l" } },
-  { 0x22, "LD HL, A",     1, 8,  nil,        nil },
+  { 0x22, "LD HL, A",     1, 8,  ld_hl_a,    1   },
   { 0x23, "INC HL",       1, 8,  nil,        nil },
   { 0x24, "INC H",        1, 4,  nil,        nil },
-  { 0x25, "DEC H",        1, 4,  nil,        nil },
-  { 0x26, "LD H, d8",     2, 8,  nil,        nil },
+  { 0x25, "DEC H",        1, 4,  dec_r8,     "h" },
+  { 0x26, "LD H, d8",     2, 8,  ld_r8_nn,   "h" },
   { 0x27, "DAA ",         1, 4,  nil,        nil },
   { 0x28, "JR Z, r8",     2, 12, nil,        nil },
   { 0x29, "ADD HL, HL",   1, 8,  nil,        nil },
   { 0x2A, "LD A, HL",     1, 8,  nil,        nil },
   { 0x2B, "DEC HL",       1, 8,  nil,        nil },
   { 0x2C, "INC L",        1, 4,  nil,        nil },
-  { 0x2D, "DEC L",        1, 4,  nil,        nil },
-  { 0x2E, "LD L, d8",     2, 8,  nil,        nil },
+  { 0x2D, "DEC L",        1, 4,  dec_r8,     "l" },
+  { 0x2E, "LD L, d8",     2, 8,  ld_r8_nn,   "l" },
   { 0x2F, "CPL ",         1, 4,  nil,        nil },
   { 0x30, "JR NC, r8",    2, 12, nil,        nil },
   { 0x31, "LD SP, d16",   3, 12, nil,        nil },
-  { 0x32, "LD HL, A",     1, 8,  nil,        nil },
+  { 0x32, "LD HL, A",     1, 8,  ld_hl_a,    -1  },
   { 0x33, "INC SP",       1, 8,  nil,        nil },
   { 0x34, "INC HL",       1, 12, nil,        nil },
-  { 0x35, "DEC HL",       1, 12, nil,        nil },
-  { 0x36, "LD HL, d8",    2, 12, nil,        nil },
+  { 0x35, "DEC HL",       1, 12, dec_r8,     "(hl)" },
+  { 0x36, "LD HL, d8",    2, 12, ld_hl_nn,   "(hl)" },
   { 0x37, "SCF ",         1, 4,  nil,        nil },
   { 0x38, "JR C, r8",     2, 12, nil,        nil },
   { 0x39, "ADD HL, SP",   1, 8,  nil,        nil },
   { 0x3A, "LD A, HL",     1, 8,  nil,        nil },
   { 0x3B, "DEC SP",       1, 8,  nil,        nil },
   { 0x3C, "INC A",        1, 4,  nil,        nil },
-  { 0x3D, "DEC A",        1, 4,  nil,        nil },
-  { 0x3E, "LD A, d8",     2, 8,  nil,        nil },
+  { 0x3D, "DEC A",        1, 4,  dec_r8,     "a" },
+  { 0x3E, "LD A, d8",     2, 8,  ld_r8_nn,   "a" },
   { 0x3F, "CCF ",         1, 4,  nil,        nil },
   { 0x40, "LD B, B",      1, 4,  nil,        nil },
   { 0x41, "LD B, C",      1, 4,  nil,        nil },
