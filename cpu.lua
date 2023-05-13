@@ -71,21 +71,22 @@ end
 
 function cpu:step()
   local opcode = memory:get(self.pc)
-  local instruction = instructions[opcode]
+  local instr = instructions[opcode + 1]
 
-  if instruction.handler == nil then
-    print(string.format("unknown instruction: 0x%02x, %s at PC:0x%04x", opcode, instruction.mnemonic, self.pc))
+  local bytes, cycles, handler, params = instr[3], instr[4], instr[5], instr[6]
+
+  if handler == nil then
+    print(string.format("unknown instruction: 0x%02x, %s at PC:0x%04x", opcode, instr[2], self.pc))
     os.exit(1)
   end
 
-  if trace then self:trace(instruction) end
+  if trace then self:trace(instr) end
 
-  self.pc = self.pc + instruction.bytes
+  self.pc = self.pc + bytes
 
-  local extra_cycles = instruction.handler(instruction.params) or 0
-  local cycles = instruction.cycles + extra_cycles
+  local extra_cycles = handler(params) or 0
 
-  return cycles
+  return cycles + extra_cycles
 end
 
 function cpu:conditional_interrupt(interrupt, value, mask)
@@ -112,7 +113,7 @@ function cpu:trace(instruction)
 
   local opcode = memory:get(self.pc)
   print(string.format("A:%02X F:%s BC:%02X%02X DE:%02X%02X HL:%02X%02X SP:%04X PC:%04X | %s",
-    cpu.a, flags, cpu.b, cpu.c, cpu.d, cpu.e, cpu.h, cpu.l, cpu.sp, cpu.pc, instruction.mnemonic
+    cpu.a, flags, cpu.b, cpu.c, cpu.d, cpu.e, cpu.h, cpu.l, cpu.sp, cpu.pc, instruction[2]
   ))
 end
 

@@ -13,6 +13,18 @@ function emulator:init(filename, args)
   -- TODO: add arg parsing
   trace = args[2] == "-t"
 
+  if args[2] == "-s" then
+    local count = 0
+    for _, instruction in ipairs(instructions) do
+      local handler = instruction[5]
+      if handler ~= nil then
+        count = count + 1
+      end
+    end
+    print(string.format("%d/%d - %.1f%%", count, 245, count / 245 * 100))
+    os.exit(0)
+  end
+
   self.rom = ffi.new("uint8_t[?]", 0x8000)
 
   local file = io.open(filename, "rb")

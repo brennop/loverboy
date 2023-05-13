@@ -7,8 +7,6 @@ local rshift, lshift, rol = bit.rshift, bit.lshift, bit.rol
 local band, bor, bxor, bnot = bit.band, bit.bor, bit.bxor, bit.bnot
 local cast = ffi.cast
 
-local instructions = {}
-
 local function compose(high, low)
   return bor(lshift(high, 0x8), low)
 end
@@ -133,7 +131,7 @@ end
 -- End Instruction handlers
 -- ]]
 
-local lookup = {
+local instructions = {
   { 0x00, "NOP ",         1, 4,  nop,        nil },
   { 0x01, "LD BC, d16",   3, 12, ld_r16_d16, { "b",    "c" } },
   { 0x02, "LD BC, A",     1, 8,  ld_mem_r8,  { bc,     "a" } },
@@ -393,20 +391,6 @@ local lookup = {
 }
 
 function instructions:init(_cpu, _memory)
-	for _, data in ipairs(lookup) do
-		local index, mnemonic, bytes, cycles, handler, params = unpack(data)
-
-		local instruction = {
-			mnemonic = mnemonic,
-			bytes = bytes,
-			cycles = cycles,
-			handler = handler,
-			params = params,
-		}
-
-		instructions[index] = instruction
-	end
-
 	-- set locals
 	cpu = _cpu
 	memory = _memory
