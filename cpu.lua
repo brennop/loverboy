@@ -27,6 +27,9 @@ local index = {
   ["(hl)"] = function(self)
     return memory:get(bor(lshift(self.h, 8), self.l))
   end,
+  ["nn"] = function(self)
+    return memory:get(self.pc - 1)
+  end
 }
 
 local newindex = {

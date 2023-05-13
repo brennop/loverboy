@@ -21,12 +21,15 @@ local function nnn()
 	return bor(lshift(memory:get(cpu.pc - 1), 0x8), memory:get(cpu.pc - 2))
 end
 
-local function set_flags(z, n, h, c)
-	cpu.f = bor(z == 0 and 0x80 or 0, lshift(n, 6), lshift(h, 5), lshift(c, 4))
-end
-
 local function c() 
   return cpu.c
+end
+
+local function set_flags(f, s, h, c)
+  cpu.f = bor(f == 0 and 0x80 or 0,
+              s and 0x40 or 0,
+              h and 0x20 or 0,
+              c and 0x10 or 0)
 end
 
 --[[
@@ -49,10 +52,20 @@ local function ld_sp_d16()
 	cpu.sp = nnn()
 end
 
+-- arith
+
 local function xor_a_r8(register)
 	cpu.a = bxor(cpu.a, cpu[register])
 	cpu.f = cpu.a == 0 and 0x80 or 0
 end
+
+local function compare(register)
+  local value = cpu[register]
+  local result = cpu.a - value
+  set_flags(result, true, band(cpu.a, 0x0F) < band(value, 0x0F), cpu.a < value)
+end
+
+---
 
 local function ld_r8_nn(register)
   cpu[register] = memory:get(cpu.pc - 1)
@@ -289,14 +302,14 @@ local lookup = {
   { 0xB5, "OR L",         1, 4,  nil,        nil },
   { 0xB6, "OR HL",        1, 8,  nil,        nil },
   { 0xB7, "OR A",         1, 4,  nil,        nil },
-  { 0xB8, "CP B",         1, 4,  nil,        nil },
-  { 0xB9, "CP C",         1, 4,  nil,        nil },
-  { 0xBA, "CP D",         1, 4,  nil,        nil },
-  { 0xBB, "CP E",         1, 4,  nil,        nil },
-  { 0xBC, "CP H",         1, 4,  nil,        nil },
-  { 0xBD, "CP L",         1, 4,  nil,        nil },
-  { 0xBE, "CP HL",        1, 8,  nil,        nil },
-  { 0xBF, "CP A",         1, 4,  nil,        nil },
+  { 0xB8, "CP B",         1, 4,  compare,        "b" },
+  { 0xB9, "CP C",         1, 4,  compare,        "c" },
+  { 0xBA, "CP D",         1, 4,  compare,        "d" },
+  { 0xBB, "CP E",         1, 4,  compare,        "e" },
+  { 0xBC, "CP H",         1, 4,  compare,        "h" },
+  { 0xBD, "CP L",         1, 4,  compare,        "l" },
+  { 0xBE, "CP HL",        1, 8,  compare,        "(hl)" },
+  { 0xBF, "CP A",         1, 4,  compare,        "a" },
   { 0xC0, "RET NZ",       1, 8,  nil,        nil },
   { 0xC1, "POP BC",       1, 12, nil,        nil },
   { 0xC2, "JP NZ, a16",   3, 12, nil,        nil },
@@ -359,7 +372,7 @@ local lookup = {
   { 0xFB, "EI ",          1, 4,  set_ime,    true },
   { 0xFC, "ILLEGAL_FC ",  1, 4,  nil,        nil },
   { 0xFD, "ILLEGAL_FD ",  1, 4,  nil,        nil },
-  { 0xFE, "CP d8",        2, 8,  nil,        nil },
+  { 0xFE, "CP d8",        2, 8,  compare,    "nn" },
   { 0xFF, "RST 38H",      1, 16, nil,        nil }
 }
 
