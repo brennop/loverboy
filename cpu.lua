@@ -23,6 +23,14 @@ local cpu = {
   memory = nil,
 }
 
+local interrupts = {
+  vblank = 0x01,
+  stat   = 0x02,
+  timer  = 0x04,
+  serial = 0x08,
+  joypad = 0x10,
+}
+
 local index = {
   ["(hl)"] = function(self)
     return memory:get(bor(lshift(self.h, 8), self.l))
@@ -61,21 +69,6 @@ function cpu:init(_memory)
   })
 end
 
-function cpu:trace(instruction)
- -- A:00 F:Z-H- BC:0000 DE:0393 HL:ffa8 SP:cfff PC:02f0
-  local z = band(cpu.f, 0x80) == 0x80 and "Z" or "-"
-  local s = band(cpu.f, 0x40) == 0x40 and "N" or "-"
-  local h = band(cpu.f, 0x20) == 0x20 and "H" or "-"
-  local c = band(cpu.f, 0x10) == 0x10 and "C" or "-"
-  local flags = z .. s .. h .. c
-
-
-  local opcode = memory:get(self.pc)
-  print(string.format("A:%02X F:%s BC:%02X%02X DE:%02X%02X HL:%02X%02X SP:%04X PC:%04X | %s",
-    cpu.a, flags, cpu.b, cpu.c, cpu.d, cpu.e, cpu.h, cpu.l, cpu.sp, cpu.pc, instruction.mnemonic
-  ))
-end
-
 function cpu:step()
   local opcode = memory:get(self.pc)
   local instruction = instructions[opcode]
@@ -85,7 +78,7 @@ function cpu:step()
     os.exit(1)
   end
 
-  self:trace(instruction)
+  if trace then self:trace(instruction) end
 
   self.pc = self.pc + instruction.bytes
 
@@ -93,6 +86,34 @@ function cpu:step()
   local cycles = instruction.cycles + extra_cycles
 
   return cycles
+end
+
+function cpu:conditional_interrupt(interrupt, value, mask)
+  if band(value, mask) ~= 0 then
+    self:interrupt(interrupt)
+  end
+end
+
+function cpu:interrupt(interrupt)
+  local interrupt_flag = memory:get(0xFF0F)
+  
+  memory:set(0xFF0F, bor(interrupt_flag, interrupts[interrupt]))
+
+  self.halt = false
+end
+
+function cpu:trace(instruction)
+ -- A:00 F:Z-H- BC:0000 DE:0393 HL:ffa8 SP:cfff PC:02f0
+  local z = band(cpu.f, 0x80) == 0x80 and "Z" or "-"
+  local s = band(cpu.f, 0x40) == 0x40 and "N" or "-"
+  local h = band(cpu.f, 0x20) == 0x20 and "H" or "-"
+  local c = band(cpu.f, 0x10) == 0x10 and "C" or "-"
+  local flags = z .. s .. h .. c
+
+  local opcode = memory:get(self.pc)
+  print(string.format("A:%02X F:%s BC:%02X%02X DE:%02X%02X HL:%02X%02X SP:%04X PC:%04X | %s",
+    cpu.a, flags, cpu.b, cpu.c, cpu.d, cpu.e, cpu.h, cpu.l, cpu.sp, cpu.pc, instruction.mnemonic
+  ))
 end
 
 return cpu

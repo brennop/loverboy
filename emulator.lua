@@ -1,14 +1,18 @@
 local ffi = require "ffi"
 
-local memory = require "memory"
 local cpu = require "cpu"
+local memory = require "memory"
+local graphics = require "graphics"
 local instructions = require "instructions"
 
 local emulator = {
   rom = nil,
 }
 
-function emulator:init(filename)
+function emulator:init(filename, args)
+  -- TODO: add arg parsing
+  trace = args[2] == "-t"
+
   self.rom = ffi.new("uint8_t[?]", 0x8000)
 
   local file = io.open(filename, "rb")
@@ -26,10 +30,12 @@ end
 
 function emulator:step()
   local cycles_this_update = 0
-  local cpu_step = cpu.step
+  local cpu_step, gpu_step = cpu.step, graphics.step
 
   while cycles_this_update < 70224 do
     cycles = cpu_step(cpu)
+    gpu_step(graphics, cycles)
+
     cycles_this_update = cycles_this_update + cycles
   end
 
