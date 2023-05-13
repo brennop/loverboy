@@ -1,7 +1,7 @@
 local instructions = require "instructions"
 local memory = nil
 
-local bor, band, lshift = bit.bor, bit.band, bit.lshift
+local bor, band, lshift, rshift = bit.bor, bit.band, bit.lshift, bit.rshift
 
 local cpu = {
   -- registers
@@ -93,6 +93,13 @@ function cpu:conditional_interrupt(interrupt, value, mask)
   if band(value, mask) ~= 0 then
     self:interrupt(interrupt)
   end
+end
+
+function cpu:push(value)
+  cpu.sp = cpu.sp - 2
+
+  memory:set(cpu.sp, band(value, 0xff))
+  memory:set(cpu.sp + 1, rshift(value, 0x8))
 end
 
 function cpu:interrupt(interrupt)
