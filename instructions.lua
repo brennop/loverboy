@@ -25,6 +25,18 @@ local function c()
   return cpu.c
 end
 
+local function bc()
+	return bor(lshift(cpu.b, 0x8), cpu.c)
+end
+
+local function de()
+	return bor(lshift(cpu.d, 0x8), cpu.e)
+end
+
+local function hl()
+	return bor(lshift(cpu.h, 0x8), cpu.l)
+end
+
 local function set_flags(f, s, h, c)
   cpu.f = bor(f == 0 and 0x80 or 0,
               s and 0x40 or 0,
@@ -50,6 +62,10 @@ end
 
 local function ld_sp_d16()
 	cpu.sp = nnn()
+end
+
+local function ld_mem_r8(data)
+  memory:set(data[1](), cpu[data[2]])
 end
 
 -- arith
@@ -120,7 +136,7 @@ end
 local lookup = {
   { 0x00, "NOP ",         1, 4,  nop,        nil },
   { 0x01, "LD BC, d16",   3, 12, ld_r16_d16, { "b",    "c" } },
-  { 0x02, "LD BC, A",     1, 8,  nil,        nil },
+  { 0x02, "LD BC, A",     1, 8,  ld_mem_r8,  { bc, "a" } },
   { 0x03, "INC BC",       1, 8,  nil,        nil },
   { 0x04, "INC B",        1, 4,  nil,        nil },
   { 0x05, "DEC B",        1, 4,  dec_r8,     "b" },
@@ -136,7 +152,7 @@ local lookup = {
   { 0x0F, "RRCA ",        1, 4,  nil,        nil },
   { 0x10, "STOP d8",      2, 4,  nil,        nil },
   { 0x11, "LD DE, d16",   3, 12, ld_r16_d16, { "d",    "e" } },
-  { 0x12, "LD DE, A",     1, 8,  nil,        nil },
+  { 0x12, "LD DE, A",     1, 8,  ld_mem_r8,  { de, "a" } },
   { 0x13, "INC DE",       1, 8,  nil,        nil },
   { 0x14, "INC D",        1, 4,  nil,        nil },
   { 0x15, "DEC D",        1, 4,  dec_r8,     "d" },
@@ -230,14 +246,14 @@ local lookup = {
   { 0x6D, "LD L, L",      1, 4,  nil,        nil },
   { 0x6E, "LD L, HL",     1, 8,  nil,        nil },
   { 0x6F, "LD L, A",      1, 4,  nil,        nil },
-  { 0x70, "LD HL, B",     1, 8,  nil,        nil },
-  { 0x71, "LD HL, C",     1, 8,  nil,        nil },
-  { 0x72, "LD HL, D",     1, 8,  nil,        nil },
-  { 0x73, "LD HL, E",     1, 8,  nil,        nil },
-  { 0x74, "LD HL, H",     1, 8,  nil,        nil },
-  { 0x75, "LD HL, L",     1, 8,  nil,        nil },
+  { 0x70, "LD HL, B",     1, 8,  ld_mem_r8,        { hl, "b" } },
+  { 0x71, "LD HL, C",     1, 8,  ld_mem_r8,        { hl, "c" } },
+  { 0x72, "LD HL, D",     1, 8,  ld_mem_r8,        { hl, "d" } },
+  { 0x73, "LD HL, E",     1, 8,  ld_mem_r8,        { hl, "e" } },
+  { 0x74, "LD HL, H",     1, 8,  ld_mem_r8,        { hl, "h" } },
+  { 0x75, "LD HL, L",     1, 8,  ld_mem_r8,        { hl, "l" } },
   { 0x76, "HALT ",        1, 4,  nil,        nil },
-  { 0x77, "LD HL, A",     1, 8,  nil,        nil },
+  { 0x77, "LD HL, A",     1, 8,  ld_mem_r8,        { hl, "a" } },
   { 0x78, "LD A, B",      1, 4,  nil,        nil },
   { 0x79, "LD A, C",      1, 4,  nil,        nil },
   { 0x7A, "LD A, D",      1, 4,  nil,        nil },
@@ -352,7 +368,7 @@ local lookup = {
   { 0xE7, "RST 20H",      1, 16, nil,        nil },
   { 0xE8, "ADD SP, r8",   2, 16, nil,        nil },
   { 0xE9, "JP HL",        1, 4,  nil,        nil },
-  { 0xEA, "LD a16, A",    3, 16, nil,        nil },
+  { 0xEA, "LD a16, A",    3, 16, ld_mem_r8,  { nnn, "a" } },
   { 0xEB, "ILLEGAL_EB ",  1, 4,  nil,        nil },
   { 0xEC, "ILLEGAL_EC ",  1, 4,  nil,        nil },
   { 0xED, "ILLEGAL_ED ",  1, 4,  nil,        nil },
