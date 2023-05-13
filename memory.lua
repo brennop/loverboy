@@ -1,12 +1,15 @@
+local ffi = require "ffi"
+
 local rshift = bit.rshift
 
 local memory = {
-  data = {},
+  data = nil,
   rom = nil,
 }
 
 function memory:init(rom)
   self.rom = rom
+  self.data = ffi.new("uint8_t[?]", 0x10000)
 end
 
 function memory:get(address)

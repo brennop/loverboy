@@ -30,7 +30,9 @@ function emulator:step()
 
   while cycles_this_update < 70224 do
     cycles = cpu_step(cpu)
+    cycles_this_update = cycles_this_update + cycles
   end
+
 end
 
 return emulator
