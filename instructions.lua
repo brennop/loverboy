@@ -13,12 +13,20 @@ local function compose(high, low)
   return bor(lshift(high, 0x8), low)
 end
 
+local function nn()
+  return memory:get(cpu.pc - 1)
+end
+
 local function nnn()
 	return bor(lshift(memory:get(cpu.pc - 1), 0x8), memory:get(cpu.pc - 2))
 end
 
 local function set_flags(z, n, h, c)
 	cpu.f = bor(z == 0 and 0x80 or 0, lshift(n, 6), lshift(h, 5), lshift(c, 4))
+end
+
+local function c() 
+  return cpu.c
 end
 
 --[[
@@ -78,6 +86,18 @@ local function jr_flag_r8(data)
     cpu.pc = cpu.pc + tonumber(cast("int8_t", memory:get(cpu.pc - 1)))
     return 4
   end
+end
+
+local function set_ime(value)
+  cpu.ime = value
+end
+
+local function write_io(getter)
+  memory:set(bor(0xff00, getter()), cpu.a)
+end
+
+local function read_io(getter)
+  cpu.a = memory:get(bor(0xff00, getter()))
 end
 
 -- [[
@@ -309,9 +329,9 @@ local lookup = {
   { 0xDD, "ILLEGAL_DD ",  1, 4,  nil,        nil },
   { 0xDE, "SBC A, d8",    2, 8,  nil,        nil },
   { 0xDF, "RST 18H",      1, 16, nil,        nil },
-  { 0xE0, "LDH a8, A",    2, 12, nil,        nil },
+  { 0xE0, "LDH a8, A",    2, 12, write_io,   nn },
   { 0xE1, "POP HL",       1, 12, nil,        nil },
-  { 0xE2, "LD C, A",      1, 8,  nil,        nil },
+  { 0xE2, "LD C, A",      1, 8,  write_io,   c },
   { 0xE3, "ILLEGAL_E3 ",  1, 4,  nil,        nil },
   { 0xE4, "ILLEGAL_E4 ",  1, 4,  nil,        nil },
   { 0xE5, "PUSH HL",      1, 16, nil,        nil },
@@ -325,10 +345,10 @@ local lookup = {
   { 0xED, "ILLEGAL_ED ",  1, 4,  nil,        nil },
   { 0xEE, "XOR d8",       2, 8,  nil,        nil },
   { 0xEF, "RST 28H",      1, 16, nil,        nil },
-  { 0xF0, "LDH A, a8",    2, 12, nil,        nil },
+  { 0xF0, "LDH A, a8",    2, 12, read_io,    nn },
   { 0xF1, "POP AF",       1, 12, nil,        nil },
-  { 0xF2, "LD A, C",      1, 8,  nil,        nil },
-  { 0xF3, "DI ",          1, 4,  nil,        nil },
+  { 0xF2, "LD A, C",      1, 8,  read_io,        c },
+  { 0xF3, "DI ",          1, 4,  set_ime,    false },
   { 0xF4, "ILLEGAL_F4 ",  1, 4,  nil,        nil },
   { 0xF5, "PUSH AF",      1, 16, nil,        nil },
   { 0xF6, "OR d8",        2, 8,  nil,        nil },
@@ -336,7 +356,7 @@ local lookup = {
   { 0xF8, "LD HL, SP+r8", 2, 12, nil,        nil },
   { 0xF9, "LD SP, HL",    1, 8,  nil,        nil },
   { 0xFA, "LD A, a16",    3, 16, nil,        nil },
-  { 0xFB, "EI ",          1, 4,  nil,        nil },
+  { 0xFB, "EI ",          1, 4,  set_ime,    true },
   { 0xFC, "ILLEGAL_FC ",  1, 4,  nil,        nil },
   { 0xFD, "ILLEGAL_FD ",  1, 4,  nil,        nil },
   { 0xFE, "CP d8",        2, 8,  nil,        nil },

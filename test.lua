@@ -117,6 +117,7 @@ local function run_test(test)
 end
 
 local function run_tests(tests)
+  local start = os.clock()
   local errors = 0
   for i = 1, 10000 do
     local test = tests[i]
@@ -135,6 +136,7 @@ local function run_tests(tests)
   end
 
   print(string.format("Passing: %d/%d", 10000 - errors, 10000))
+  print(string.format("elapsed time: %.2f\n", os.clock() - start))
 end
 
 run_tests(tests)
