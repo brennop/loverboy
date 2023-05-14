@@ -55,11 +55,30 @@ local function sp()
   return cpu.sp
 end
 
+local function pop()
+  return cpu:pop()
+end
+
+local function push()
+  cpu:push(cpu.pc)
+  return nnn() 
+end
+
 local function set_flags(f, s, h, c)
   cpu.f = bor(f == 0 and 0x80 or 0,
               s and 0x40 or 0,
               h and 0x20 or 0,
               c and 0x10 or 0)
+end
+
+local function get_flag_condition()
+  local masked = band(cpu.opcode, 0x18)
+
+  if masked == 0x00 then return band(cpu.f, 0x80) == 0
+  elseif masked == 0x08 then return band(cpu.f, 0x80) == 0x80
+  elseif masked == 0x10 then return band(cpu.f, 0x10) == 0
+  elseif masked == 0x18 then return band(cpu.f, 0x10) == 0x10
+  end
 end
 
 --[[
@@ -74,6 +93,18 @@ local function jp_nnn(save)
   local target = nnn()
   if save then cpu:push(cpu.pc) end
 	cpu.pc = target
+end
+
+--- conditional jumps
+-- @param target
+local function jp_cond(target)
+  if get_flag_condition() then
+    cpu.pc = target()
+
+    -- FIXME: jp_flag don't read so much memory
+    -- so they only add 4 cycles instead of 12
+    return 12
+  end
 end
 
 local function ret(ime)
@@ -460,35 +491,35 @@ local instructions = {
   { 0xBD, "CP L",         1, 4,  compare,    "l" },
   { 0xBE, "CP HL",        1, 8,  compare,    "(hl)" },
   { 0xBF, "CP A",         1, 4,  compare,    "a" },
-  { 0xC0, "RET NZ",       1, 8,  nil,        nil },
+  { 0xC0, "RET NZ",       1, 8,  jp_cond,    pop },
   { 0xC1, "POP BC",       1, 12, pop_r16,    { "b", "c" } },
-  { 0xC2, "JP NZ, a16",   3, 12, nil,        nil },
+  { 0xC2, "JP NZ, a16",   3, 12, jp_cond,    nnn },
   { 0xC3, "JP a16",       3, 16, jp_nnn,     false },
-  { 0xC4, "CALL NZ, a16", 3, 12, nil,        nil },
+  { 0xC4, "CALL NZ, a16", 3, 12, jp_cond,    push },
   { 0xC5, "PUSH BC",      1, 16, push_r16,   { "b", "c" } },
   { 0xC6, "ADD A, d8",    2, 8,  nil,        nil },
   { 0xC7, "RST 00H",      1, 16, rst,        0x00 },
-  { 0xC8, "RET Z",        1, 8,  nil,        nil },
+  { 0xC8, "RET Z",        1, 8,  jp_cond,    pop },
   { 0xC9, "RET ",         1, 16, ret,        nil },
-  { 0xCA, "JP Z, a16",    3, 12, nil,        nil },
+  { 0xCA, "JP Z, a16",    3, 12, jp_cond,    nnn },
   { 0xCB, "PREFIX ",      2, 4,   cb,        nil },
-  { 0xCC, "CALL Z, a16",  3, 12, nil,        nil },
+  { 0xCC, "CALL Z, a16",  3, 12, jp_cond,    push },
   { 0xCD, "CALL a16",     3, 24, jp_nnn,     true },
   { 0xCE, "ADC A, d8",    2, 8,  nil,        nil },
   { 0xCF, "RST 08H",      1, 16, rst,        0x08 },
-  { 0xD0, "RET NC",       1, 8,  nil,        nil },
+  { 0xD0, "RET NC",       1, 8,  jp_cond,    pop },
   { 0xD1, "POP DE",       1, 12, pop_r16,    { "d", "e" } },
-  { 0xD2, "JP NC, a16",   3, 12, nil,        nil },
+  { 0xD2, "JP NC, a16",   3, 12, jp_cond,    nnn },
   { 0xD3, "ILLEGAL_D3 ",  1, 4,  nil,        nil },
-  { 0xD4, "CALL NC, a16", 3, 12, nil,        nil },
+  { 0xD4, "CALL NC, a16", 3, 12, jp_cond,    push },
   { 0xD5, "PUSH DE",      1, 16, push_r16,   { "d", "e" } },
   { 0xD6, "SUB d8",       2, 8,  nil,        nil },
   { 0xD7, "RST 10H",      1, 16, rst,        0x10 },
-  { 0xD8, "RET C",        1, 8,  nil,        nil },
+  { 0xD8, "RET C",        1, 8,  jp_cond,    pop },
   { 0xD9, "RETI ",        1, 16, ret,        true },
-  { 0xDA, "JP C, a16",    3, 12, nil,        nil },
+  { 0xDA, "JP C, a16",    3, 12, jp_cond,    nnn },
   { 0xDB, "ILLEGAL_DB ",  1, 4,  nil,        nil },
-  { 0xDC, "CALL C, a16",  3, 12, nil,        nil },
+  { 0xDC, "CALL C, a16",  3, 12, jp_cond,    push },
   { 0xDD, "ILLEGAL_DD ",  1, 4,  nil,        nil },
   { 0xDE, "SBC A, d8",    2, 8,  nil,        nil },
   { 0xDF, "RST 18H",      1, 16, rst,        0x18 },

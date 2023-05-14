@@ -20,6 +20,9 @@ local cpu = {
   halt = false,
   cycles = 0,
 
+  -- current opcode, used in some instructions
+  opcode = 0,
+
   memory = nil,
 }
 
@@ -70,13 +73,13 @@ function cpu:init(_memory)
 end
 
 function cpu:step()
-  local opcode = memory:get(self.pc)
-  local instr = instructions[opcode + 1]
+  cpu.opcode = memory:get(self.pc)
+  local instr = instructions[cpu.opcode + 1]
 
   local bytes, cycles, handler, params = instr[3], instr[4], instr[5], instr[6]
 
   if handler == nil then
-    print(string.format("unknown instruction: 0x%02x, %s at PC:0x%04x", opcode, instr[2], self.pc))
+    print(string.format("unknown instruction: 0x%02x, %s at PC:0x%04x", cpu.opcode, instr[2], self.pc))
     os.exit(1)
   end
 
