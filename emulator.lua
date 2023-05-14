@@ -32,12 +32,15 @@ function emulator:init(filename, args)
   for i = 0, 0x7fff do
     self.rom[i] = file:read(1):byte()
   end
+
+  file:close()
   
   memory:init(self.rom)
   cpu:init(memory)
   instructions:init(cpu, memory)
+  graphics:init()
 
-  file:close()
+  self.image = love.graphics.newImage(graphics.framebuffer)
 end
 
 function emulator:step()
@@ -51,6 +54,11 @@ function emulator:step()
     cycles_this_update = cycles_this_update + cycles
   end
 
+  self.image:replacePixels(graphics.framebuffer)
+end
+
+function emulator:draw()
+  love.graphics.draw(self.image, 0, 0, 0, 4, 4)
 end
 
 return emulator

@@ -7,3 +7,7 @@ end
 function love.update()
   emulator:step()
 end
+
+function love.draw()
+  emulator:draw()
+end
