@@ -15,6 +15,7 @@ a gameboy emulador made with löve
 |----------------------|----------|
 | <kbd>Enter</kbd>     | Start    |
 | <kbd>Backspace</kbd> | Select   |
-| <kbd>x</kdb>         | A        |
-| <kbd>z</kdb>         | B        |
+| <kbd>x</kbd>         | A        |
+| <kbd>z</kbd>         | B        |
 | Arrow Keys           | D-Pad    |
+| <kbd>p</kbd>         | Change Palette    |
