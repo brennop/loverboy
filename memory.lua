@@ -7,11 +7,14 @@ local is_down = love.keyboard.isDown
 local memory = {
   data = nil,
   rom = nil,
+  rom_bank = 0,
 }
 
 function memory:init(rom)
   self.rom = rom
   self.data = ffi.new("uint8_t[?]", 0x10000)
+
+  self.rom_bank = 1
 end
 
 function memory:get(address)
@@ -19,6 +22,8 @@ function memory:get(address)
 
   if range < 0x04 then
     return self.rom[address]
+  elseif range < 0x08 then
+    return self.rom[address - 0x4000 + self.rom_bank * 0x4000]
   elseif range < 0x10 then
     if address == 0xff00 then
       return self:get_input()
