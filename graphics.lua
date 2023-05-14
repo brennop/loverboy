@@ -32,7 +32,7 @@ local modes = {
 
 -- TODO: implement this
 local function get_color(value, palette)
-  local color = value * 85 / 256
+  local color = 1 - value * 85 / 256
   return color, color, color
 end
 

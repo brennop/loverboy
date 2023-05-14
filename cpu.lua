@@ -2,6 +2,10 @@ local instructions = require "instructions"
 local memory = nil
 
 local bor, band, lshift, rshift = bit.bor, bit.band, bit.lshift, bit.rshift
+local bxor = bit.bxor
+
+local IE = 0xFFFF
+local IF = 0xFF0F
 
 local cpu = {
   -- registers
@@ -73,6 +77,10 @@ function cpu:init(_memory)
 end
 
 function cpu:step()
+  self:check_interrupts()
+
+  if self.halt then return 4 end
+
   cpu.opcode = memory:get(self.pc)
   local instr = instructions[cpu.opcode + 1]
 
@@ -90,6 +98,32 @@ function cpu:step()
   local extra_cycles = handler(params) or 0
 
   return cycles + extra_cycles
+end
+
+local interrupt_handlers = { 0x40, 0x48, 0x50, 0x58, 0x60 }
+
+function cpu:check_interrupts()
+  if self.ime then
+    local flags = memory:get(IF)
+    local interrupt = band(memory:get(IE), flags)
+
+    if interrupt ~= 0 then
+      -- no nested interrupts
+      self.ime = false
+
+      -- save pc
+      self:push(cpu.pc)
+
+      for index = 1, 5 do
+        local mask = lshift(1, index)
+        if band(interrupt, mask) ~= 0 then
+          cpu.pc = interrupt_handlers[index]
+          memory:set(IF, band(flags, bxor(mask, 0xff)))
+          break
+        end
+      end
+    end
+  end
 end
 
 function cpu:conditional_interrupt(interrupt, value, mask)

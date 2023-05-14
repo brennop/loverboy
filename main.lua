@@ -1,6 +1,7 @@
 local emulator = require "emulator"
 
 function love.load()
+  love.graphics.setDefaultFilter("nearest", "nearest")
   emulator:init("tetris.gb", arg)
 end
 
