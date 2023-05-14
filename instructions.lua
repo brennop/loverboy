@@ -275,7 +275,7 @@ local function bit(opcode)
 end
 
 local function cb()
-  local opcode = memory:get(cpu.pc)
+  local opcode = nn()
   local range = rshift(opcode, 6)
   local register = registers[band(opcode, 0x07) + 1]
   local value = cpu[register]

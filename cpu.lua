@@ -115,7 +115,7 @@ function cpu:check_interrupts()
       self:push(cpu.pc)
 
       for index = 1, 5 do
-        local mask = lshift(1, index)
+        local mask = lshift(1, index - 1)
         if band(interrupt, mask) ~= 0 then
           cpu.pc = interrupt_handlers[index]
           memory:set(IF, band(flags, bxor(mask, 0xff)))

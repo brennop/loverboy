@@ -14,6 +14,18 @@ function memory:init(rom)
   self.rom = rom
   self.data = ffi.new("uint8_t[?]", 0x10000)
 
+  -- https://gbdev.io/pandocs/Power_Up_Sequence.html#hardware-registers
+  self.data[0xFF00] = 0xCF;
+  self.data[0xFF04] = 0xAB;
+  self.data[0xFF05] = 0x00;
+  self.data[0xFF40] = 0x91;
+  self.data[0xFF41] = 0x85;
+  self.data[0xFF42] = 0x00;
+  self.data[0xFF43] = 0x00;
+  self.data[0xFF45] = 0x00;
+  self.data[0xFF46] = 0xFF;
+  self.data[0xFF47] = 0xFC;
+
   self.rom_bank = 1
 end
 

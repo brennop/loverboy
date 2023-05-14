@@ -5,8 +5,15 @@ local memory = require "memory"
 local graphics = require "graphics"
 local instructions = require "instructions"
 
+local band, bor = bit.band, bit.bor
+
+local freqs = { 1024, 16, 64, 256 }
+
 local emulator = {
   rom = nil,
+
+  div = 0,
+  tima = 0,
 }
 
 function emulator:init(filename, args)
@@ -45,11 +52,11 @@ end
 
 function emulator:step()
   local cycles_this_update = 0
-  local cpu_step, gpu_step = cpu.step, graphics.step
 
   while cycles_this_update < 70224 do
-    cycles = cpu_step(cpu)
-    gpu_step(graphics, cycles)
+    cycles = cpu:step()
+    self:update_timers(cycles)
+    graphics:step(cycles)
 
     cycles_this_update = cycles_this_update + cycles
   end
@@ -59,6 +66,37 @@ end
 
 function emulator:draw()
   love.graphics.draw(self.image, 0, 0, 0, 4, 4)
+end
+
+-- TODO: maybe create timers object
+function emulator:update_timers(cycles)
+  local div = memory:get(0xFF04)
+  local tima = memory:get(0xFF05)
+  local tma = memory:get(0xFF06)
+  local attributes = memory:get(0xFF07)
+
+  self.div = self.div + cycles
+  if self.div >= 256 then
+    self.div = 0
+    memory:set(0xFF04, div + 1)
+  end
+
+  if band(attributes, 0x04) == 0x04 then
+    self.tima = self.tima + cycles
+
+    local freq = band(attributes, 0x03)
+    local clock_speed = freqs[freq + 1]
+
+    if self.tima >= clock_speed then
+      self.tima = 0
+      memory:set(0xFF05, band(tima + 1, 0xFF))
+
+      if tima == 0xFF then
+        memory:set(0xFF05, tma)
+        cpu:interrupt "timer"
+      end
+    end
+  end
 end
 
 return emulator
