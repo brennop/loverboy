@@ -3,7 +3,7 @@ local ffi = require "ffi"
 local cpu = nil
 local memory = nil
 
-local rshift, lshift, rol = bit.rshift, bit.lshift, bit.rol
+local rshift, lshift, rol, ror = bit.rshift, bit.lshift, bit.rol, bit.ror
 local band, bor, bxor, bnot = bit.band, bit.bor, bit.bxor, bit.bnot
 local cast = ffi.cast
 
@@ -147,6 +147,29 @@ local function add_a_r8(register)
   set_flags(cpu.a, false, band(cpu.a, 0x0F) < band(value, 0x0F), cpu.a < value)
 end
 
+local function adc_a_r8(register)
+  local carry_value = rshift(band(cpu.f, 0x10), 4)
+  local value = cpu[register]
+  local result = cpu.a + value + carry_value
+
+  local half = band(band(cpu.a, 0x0f) + band(value, 0x0f) + carry_value, 0x10) == 0x10
+  local carry = band(result, 0x100) == 0x100
+
+  cpu.a = band(result, 0xff)
+  set_flags(cpu.a, false, half, carry)
+end
+
+local function sub_a_r8(register)
+  local value = cpu[register]
+  local result = cpu.a - value
+
+  local half = band(band(cpu.a, 0x0f) - band(value, 0x0f), 0x10) == 0x10
+  local carry = band(result, 0x100) == 0x100
+
+  cpu.a = band(result, 0xff)
+  set_flags(result, true, half, carry)
+end
+
 local function and_a_r8(register)
 	cpu.a = band(cpu.a, cpu[register])
 	cpu.f = bor(cpu.a == 0 and 0x80 or 0, 0x20)
@@ -169,6 +192,11 @@ local function compare(register)
 end
 
 ---
+
+local function rlca(data)
+  cpu.f = lshift(rshift(cpu.a, 7), 4)
+  cpu.a = bor(band(lshift(cpu.a, 1), 0xff), rshift(band(cpu.f, 0x10), 4))
+end
 
 local function ld_r8_r8(registers)
   cpu[registers[1]] = cpu[registers[2]]
@@ -274,6 +302,28 @@ local function bit(opcode)
   return lshift(1, (rshift(band(opcode, 0x38), 3)))
 end
 
+
+
+local cb_handlers = {
+  nil,
+  nil,
+  nil,
+  nil,
+  function(value) -- SLA
+    local carry = rshift(value, 7)
+    value = lshift(value, 1)
+    set_flags(value, false, false, carry == 1)
+    return value
+  end,
+  nil,
+  function(value) -- SWAP
+    local result = bor(lshift(band(value, 0xf), 4), rshift(band(value, 0xf0), 4))
+    cpu.f = result == 0 and 0x80 or 0
+    return result
+  end,
+  nil,
+}
+
 local function cb()
   local opcode = nn()
   local range = rshift(opcode, 6)
@@ -282,16 +332,20 @@ local function cb()
   local carry = band(cpu.f, 0x10)
 
   if range == 0 then
+    local handler = cb_handlers[rshift(opcode, 3) + 1]
+    if handler == nil then
+      print(string.format("unknown cb instruction: 0x%02x, at PC:0x%04x", opcode, cpu.pc - 2))
+      os.exit(1)
+    end
+    cpu[register] = handler(value, carry)
   elseif range == 1 then -- BIT
     cpu.f = bor(band(value, bit(opcode)) == 0 and 0x80 or 0, 0x20, band(cpu.f, 0x10))
-    return
   elseif range == 2 then
+    cpu[register] = band(value, bxor(bit(opcode), 0xff))
   elseif range == 3 then
     cpu[register] = bor(value, bit(opcode))
-    return
   end
 
-  print(string.format("unknown cb instruction: 0x%02x, at PC:0x%04x", opcode, cpu.pc - 2))
 end
 
 -- [[
@@ -306,7 +360,7 @@ local instructions = {
   { 0x04, "INC B",        1, 4,  inc_r8,     "b" },
   { 0x05, "DEC B",        1, 4,  dec_r8,     "b" },
   { 0x06, "LD B, d8",     2, 8,  ld_r8_nn,   "b" },
-  { 0x07, "RLCA ",        1, 4,  nil,        nil },
+  { 0x07, "RLCA ",        1, 4,  rlca,       nil },
   { 0x08, "LD a16, SP",   3, 20, nil,        nil },
   { 0x09, "ADD HL, BC",   1, 8,  add_hl_r16,  bc },
   { 0x0A, "LD A, BC",     1, 8,  ld_r8_mem,   { "a", bc } },
@@ -435,22 +489,22 @@ local instructions = {
   { 0x85, "ADD A, L",     1, 4,  add_a_r8,   "l" },
   { 0x86, "ADD A, HL",    1, 8,  add_a_r8,   "(hl)" },
   { 0x87, "ADD A, A",     1, 4,  add_a_r8,   "a" },
-  { 0x88, "ADC A, B",     1, 4,  nil,        nil },
-  { 0x89, "ADC A, C",     1, 4,  nil,        nil },
-  { 0x8A, "ADC A, D",     1, 4,  nil,        nil },
-  { 0x8B, "ADC A, E",     1, 4,  nil,        nil },
-  { 0x8C, "ADC A, H",     1, 4,  nil,        nil },
-  { 0x8D, "ADC A, L",     1, 4,  nil,        nil },
-  { 0x8E, "ADC A, HL",    1, 8,  nil,        nil },
-  { 0x8F, "ADC A, A",     1, 4,  nil,        nil },
-  { 0x90, "SUB B",        1, 4,  nil,        nil },
-  { 0x91, "SUB C",        1, 4,  nil,        nil },
-  { 0x92, "SUB D",        1, 4,  nil,        nil },
-  { 0x93, "SUB E",        1, 4,  nil,        nil },
-  { 0x94, "SUB H",        1, 4,  nil,        nil },
-  { 0x95, "SUB L",        1, 4,  nil,        nil },
-  { 0x96, "SUB HL",       1, 8,  nil,        nil },
-  { 0x97, "SUB A",        1, 4,  nil,        nil },
+  { 0x88, "ADC A, B",     1, 4,  adc_a_r8,   "b" },
+  { 0x89, "ADC A, C",     1, 4,  adc_a_r8,   "c" },
+  { 0x8A, "ADC A, D",     1, 4,  adc_a_r8,   "d" },
+  { 0x8B, "ADC A, E",     1, 4,  adc_a_r8,   "e" },
+  { 0x8C, "ADC A, H",     1, 4,  adc_a_r8,   "h" },
+  { 0x8D, "ADC A, L",     1, 4,  adc_a_r8,   "l" },
+  { 0x8E, "ADC A, HL",    1, 8,  adc_a_r8,   "(hl)" },
+  { 0x8F, "ADC A, A",     1, 4,  adc_a_r8,   "a" },
+  { 0x90, "SUB B",        1, 4,  sub_a_r8,   "b" },
+  { 0x91, "SUB C",        1, 4,  sub_a_r8,   "c" },
+  { 0x92, "SUB D",        1, 4,  sub_a_r8,   "d" },
+  { 0x93, "SUB E",        1, 4,  sub_a_r8,   "e" },
+  { 0x94, "SUB H",        1, 4,  sub_a_r8,   "h" },
+  { 0x95, "SUB L",        1, 4,  sub_a_r8,   "l" },
+  { 0x96, "SUB HL",       1, 8,  sub_a_r8,   "(hl)" },
+  { 0x97, "SUB A",        1, 4,  sub_a_r8,   "a" },
   { 0x98, "SBC A, B",     1, 4,  nil,        nil },
   { 0x99, "SBC A, C",     1, 4,  nil,        nil },
   { 0x9A, "SBC A, D",     1, 4,  nil,        nil },
@@ -497,7 +551,7 @@ local instructions = {
   { 0xC3, "JP a16",       3, 16, jp_nnn,     false },
   { 0xC4, "CALL NZ, a16", 3, 12, jp_cond,    push },
   { 0xC5, "PUSH BC",      1, 16, push_r16,   { "b", "c" } },
-  { 0xC6, "ADD A, d8",    2, 8,  nil,        nil },
+  { 0xC6, "ADD A, d8",    2, 8,  add_a_r8,   "nn" },
   { 0xC7, "RST 00H",      1, 16, rst,        0x00 },
   { 0xC8, "RET Z",        1, 8,  jp_cond,    pop },
   { 0xC9, "RET ",         1, 16, ret,        nil },
@@ -513,7 +567,7 @@ local instructions = {
   { 0xD3, "ILLEGAL_D3 ",  1, 4,  nil,        nil },
   { 0xD4, "CALL NC, a16", 3, 12, jp_cond,    push },
   { 0xD5, "PUSH DE",      1, 16, push_r16,   { "d", "e" } },
-  { 0xD6, "SUB d8",       2, 8,  nil,        nil },
+  { 0xD6, "SUB d8",       2, 8,  sub_a_r8,   "nn" },
   { 0xD7, "RST 10H",      1, 16, rst,        0x10 },
   { 0xD8, "RET C",        1, 8,  jp_cond,    pop },
   { 0xD9, "RETI ",        1, 16, ret,        true },
@@ -537,7 +591,7 @@ local instructions = {
   { 0xEB, "ILLEGAL_EB ",  1, 4,  nil,        nil },
   { 0xEC, "ILLEGAL_EC ",  1, 4,  nil,        nil },
   { 0xED, "ILLEGAL_ED ",  1, 4,  nil,        nil },
-  { 0xEE, "XOR d8",       2, 8,  nil,        nil },
+  { 0xEE, "XOR d8",       2, 8,  xor_a_r8,   "nn" },
   { 0xEF, "RST 28H",      1, 16, rst,        0x28 },
   { 0xF0, "LDH A, a8",    2, 12, read_io,    nn },
   { 0xF1, "POP AF",       1, 12, pop_r16,    { "a", "f" } },
@@ -545,7 +599,7 @@ local instructions = {
   { 0xF3, "DI ",          1, 4,  set_ime,    false },
   { 0xF4, "ILLEGAL_F4 ",  1, 4,  nil,        nil },
   { 0xF5, "PUSH AF",      1, 16, push_r16,   { "a", "f" } },
-  { 0xF6, "OR d8",        2, 8,  nil,        nil },
+  { 0xF6, "OR d8",        2, 8,  or_a_r8,    "nn" },
   { 0xF7, "RST 30H",      1, 16, rst,        0x30 },
   { 0xF8, "LD HL, SP+r8", 2, 12, nil,        nil },
   { 0xF9, "LD SP, HL",    1, 8,  nil,        nil },
