@@ -102,6 +102,13 @@ function cpu:push(value)
   memory:set(cpu.sp + 1, rshift(value, 0x8))
 end
 
+function cpu:pop()
+  local value = bor(memory:get(cpu.sp), lshift(memory:get(cpu.sp + 1), 8))
+  cpu.sp = cpu.sp + 2;
+
+  return value;
+end
+
 function cpu:interrupt(interrupt)
   local interrupt_flag = memory:get(0xFF0F)
   

@@ -56,6 +56,16 @@ local function jp_nnn(save)
 	cpu.pc = target
 end
 
+local function ret(ime)
+  cpu.pc = cpu:pop()
+  if ime then cpu.ime = true end
+end
+
+local function cpl()
+  cpu.a = bxor(cpu.a, 0xff)
+  cpu.f = bor(cpu.f, 0x60)
+end
+
 local function ld_r16_d16(reg)
 	cpu[reg[1]], cpu[reg[2]] = memory:get(cpu.pc - 1), memory:get(cpu.pc - 2)
 end
@@ -70,8 +80,18 @@ end
 
 -- arith
 
+local function and_a_r8(register)
+	cpu.a = band(cpu.a, cpu[register])
+	cpu.f = bor(cpu.a == 0 and 0x80 or 0, 0x20)
+end
+
 local function xor_a_r8(register)
 	cpu.a = bxor(cpu.a, cpu[register])
+	cpu.f = cpu.a == 0 and 0x80 or 0
+end
+
+local function or_a_r8(register)
+	cpu.a = bor(cpu.a, cpu[register])
 	cpu.f = cpu.a == 0 and 0x80 or 0
 end
 
@@ -157,6 +177,11 @@ local function read_io(getter)
   cpu.a = memory:get(bor(0xff00, getter()))
 end
 
+local function rst(target)
+  cpu:push(cpu.pc)
+  cpu.pc = target
+end
+
 -- [[
 -- End Instruction handlers
 -- ]]
@@ -209,7 +234,7 @@ local instructions = {
   { 0x2C, "INC L",        1, 4,  inc_r8,     "l" },
   { 0x2D, "DEC L",        1, 4,  dec_r8,     "l" },
   { 0x2E, "LD L, d8",     2, 8,  ld_r8_nn,   "l" },
-  { 0x2F, "CPL ",         1, 4,  nil,        nil },
+  { 0x2F, "CPL ",         1, 4,  cpl,        nil },
   { 0x30, "JR NC, r8",    2, 8,  jr_flag_r8, { 0x10,   0x00 } },
   { 0x31, "LD SP, d16",   3, 12, ld_sp_d16,  nil },
   { 0x32, "LD HL, A",     1, 8,  ld_hl_a,    -1  },
@@ -322,14 +347,14 @@ local instructions = {
   { 0x9D, "SBC A, L",     1, 4,  nil,        nil },
   { 0x9E, "SBC A, HL",    1, 8,  nil,        nil },
   { 0x9F, "SBC A, A",     1, 4,  nil,        nil },
-  { 0xA0, "AND B",        1, 4,  nil,        nil },
-  { 0xA1, "AND C",        1, 4,  nil,        nil },
-  { 0xA2, "AND D",        1, 4,  nil,        nil },
-  { 0xA3, "AND E",        1, 4,  nil,        nil },
-  { 0xA4, "AND H",        1, 4,  nil,        nil },
-  { 0xA5, "AND L",        1, 4,  nil,        nil },
-  { 0xA6, "AND HL",       1, 8,  nil,        nil },
-  { 0xA7, "AND A",        1, 4,  nil,        nil },
+  { 0xA0, "AND B",        1, 4,  and_a_r8,   "b" },
+  { 0xA1, "AND C",        1, 4,  and_a_r8,   "c" },
+  { 0xA2, "AND D",        1, 4,  and_a_r8,   "d" },
+  { 0xA3, "AND E",        1, 4,  and_a_r8,   "e" },
+  { 0xA4, "AND H",        1, 4,  and_a_r8,   "h" },
+  { 0xA5, "AND L",        1, 4,  and_a_r8,   "l" },
+  { 0xA6, "AND HL",       1, 8,  and_a_r8,   "(hl)" },
+  { 0xA7, "AND A",        1, 4,  and_a_r8,   "a" },
   { 0xA8, "XOR B",        1, 4,  xor_a_r8,   "b" },
   { 0xA9, "XOR C",        1, 4,  xor_a_r8,   "c" },
   { 0xAA, "XOR D",        1, 4,  xor_a_r8,   "d" },
@@ -338,14 +363,14 @@ local instructions = {
   { 0xAD, "XOR L",        1, 4,  xor_a_r8,   "l" },
   { 0xAE, "XOR HL",       1, 8,  xor_a_r8,   "(hl)" },
   { 0xAF, "XOR A",        1, 4,  xor_a_r8,   "a" },
-  { 0xB0, "OR B",         1, 4,  nil,        nil },
-  { 0xB1, "OR C",         1, 4,  nil,        nil },
-  { 0xB2, "OR D",         1, 4,  nil,        nil },
-  { 0xB3, "OR E",         1, 4,  nil,        nil },
-  { 0xB4, "OR H",         1, 4,  nil,        nil },
-  { 0xB5, "OR L",         1, 4,  nil,        nil },
-  { 0xB6, "OR HL",        1, 8,  nil,        nil },
-  { 0xB7, "OR A",         1, 4,  nil,        nil },
+  { 0xB0, "OR B",         1, 4,  or_a_r8,   "b" },
+  { 0xB1, "OR C",         1, 4,  or_a_r8,   "c" },
+  { 0xB2, "OR D",         1, 4,  or_a_r8,   "d" },
+  { 0xB3, "OR E",         1, 4,  or_a_r8,   "e" },
+  { 0xB4, "OR H",         1, 4,  or_a_r8,   "h" },
+  { 0xB5, "OR L",         1, 4,  or_a_r8,   "l" },
+  { 0xB6, "OR HL",        1, 8,  or_a_r8,   "(hl)" },
+  { 0xB7, "OR A",         1, 4,  or_a_r8,   "a" },
   { 0xB8, "CP B",         1, 4,  compare,    "b" },
   { 0xB9, "CP C",         1, 4,  compare,    "c" },
   { 0xBA, "CP D",         1, 4,  compare,    "d" },
@@ -361,15 +386,15 @@ local instructions = {
   { 0xC4, "CALL NZ, a16", 3, 12, nil,        nil },
   { 0xC5, "PUSH BC",      1, 16, nil,        nil },
   { 0xC6, "ADD A, d8",    2, 8,  nil,        nil },
-  { 0xC7, "RST 00H",      1, 16, nil,        nil },
+  { 0xC7, "RST 00H",      1, 16, rst,        0x00 },
   { 0xC8, "RET Z",        1, 8,  nil,        nil },
-  { 0xC9, "RET ",         1, 16, nil,        nil },
+  { 0xC9, "RET ",         1, 16, ret,        nil },
   { 0xCA, "JP Z, a16",    3, 12, nil,        nil },
   { 0xCB, "PREFIX ",      1, 4,  nil,        nil },
   { 0xCC, "CALL Z, a16",  3, 12, nil,        nil },
   { 0xCD, "CALL a16",     3, 24, jp_nnn,     true },
   { 0xCE, "ADC A, d8",    2, 8,  nil,        nil },
-  { 0xCF, "RST 08H",      1, 16, nil,        nil },
+  { 0xCF, "RST 08H",      1, 16, rst,        0x08 },
   { 0xD0, "RET NC",       1, 8,  nil,        nil },
   { 0xD1, "POP DE",       1, 12, nil,        nil },
   { 0xD2, "JP NC, a16",   3, 12, nil,        nil },
@@ -377,15 +402,15 @@ local instructions = {
   { 0xD4, "CALL NC, a16", 3, 12, nil,        nil },
   { 0xD5, "PUSH DE",      1, 16, nil,        nil },
   { 0xD6, "SUB d8",       2, 8,  nil,        nil },
-  { 0xD7, "RST 10H",      1, 16, nil,        nil },
+  { 0xD7, "RST 10H",      1, 16, rst,        0x10 },
   { 0xD8, "RET C",        1, 8,  nil,        nil },
-  { 0xD9, "RETI ",        1, 16, nil,        nil },
+  { 0xD9, "RETI ",        1, 16, ret,        true },
   { 0xDA, "JP C, a16",    3, 12, nil,        nil },
   { 0xDB, "ILLEGAL_DB ",  1, 4,  nil,        nil },
   { 0xDC, "CALL C, a16",  3, 12, nil,        nil },
   { 0xDD, "ILLEGAL_DD ",  1, 4,  nil,        nil },
   { 0xDE, "SBC A, d8",    2, 8,  nil,        nil },
-  { 0xDF, "RST 18H",      1, 16, nil,        nil },
+  { 0xDF, "RST 18H",      1, 16, rst,        0x18 },
   { 0xE0, "LDH a8, A",    2, 12, write_io,   nn },
   { 0xE1, "POP HL",       1, 12, nil,        nil },
   { 0xE2, "LD C, A",      1, 8,  write_io,   c },
@@ -393,7 +418,7 @@ local instructions = {
   { 0xE4, "ILLEGAL_E4 ",  1, 4,  nil,        nil },
   { 0xE5, "PUSH HL",      1, 16, nil,        nil },
   { 0xE6, "AND d8",       2, 8,  nil,        nil },
-  { 0xE7, "RST 20H",      1, 16, nil,        nil },
+  { 0xE7, "RST 20H",      1, 16, rst,        0x20 },
   { 0xE8, "ADD SP, r8",   2, 16, nil,        nil },
   { 0xE9, "JP HL",        1, 4,  nil,        nil },
   { 0xEA, "LD a16, A",    3, 16, ld_mem_r8,  { nnn,    "a" } },
@@ -401,7 +426,7 @@ local instructions = {
   { 0xEC, "ILLEGAL_EC ",  1, 4,  nil,        nil },
   { 0xED, "ILLEGAL_ED ",  1, 4,  nil,        nil },
   { 0xEE, "XOR d8",       2, 8,  nil,        nil },
-  { 0xEF, "RST 28H",      1, 16, nil,        nil },
+  { 0xEF, "RST 28H",      1, 16, rst,        0x28 },
   { 0xF0, "LDH A, a8",    2, 12, read_io,    nn },
   { 0xF1, "POP AF",       1, 12, nil,        nil },
   { 0xF2, "LD A, C",      1, 8,  read_io,    c },
@@ -409,7 +434,7 @@ local instructions = {
   { 0xF4, "ILLEGAL_F4 ",  1, 4,  nil,        nil },
   { 0xF5, "PUSH AF",      1, 16, nil,        nil },
   { 0xF6, "OR d8",        2, 8,  nil,        nil },
-  { 0xF7, "RST 30H",      1, 16, nil,        nil },
+  { 0xF7, "RST 30H",      1, 16, rst,        0x30 },
   { 0xF8, "LD HL, SP+r8", 2, 12, nil,        nil },
   { 0xF9, "LD SP, HL",    1, 8,  nil,        nil },
   { 0xFA, "LD A, a16",    3, 16, nil,        nil },
@@ -417,7 +442,7 @@ local instructions = {
   { 0xFC, "ILLEGAL_FC ",  1, 4,  nil,        nil },
   { 0xFD, "ILLEGAL_FD ",  1, 4,  nil,        nil },
   { 0xFE, "CP d8",        2, 8,  compare,    "nn" },
-  { 0xFF, "RST 38H",      1, 16, nil,        nil }
+  { 0xFF, "RST 38H",      1, 16, rst,        0x38 }
 }
 
 function instructions:init(_cpu, _memory)

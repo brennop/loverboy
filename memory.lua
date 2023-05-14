@@ -49,7 +49,7 @@ function memory:get_input()
     if is_down "a" then joypad = bor(joypad, 0x01) end
     if is_down "b" then joypad = bor(joypad, 0x02) end
     if is_down "backspace" then joypad = bor(joypad, 0x04) end
-    if is_down "enter" then joypad = bor(joypad, 0x08) end
+    if is_down "return" then joypad = bor(joypad, 0x08) end
   end
 
   return bor(0xC0, band(0x3F, bnot(joypad)))
