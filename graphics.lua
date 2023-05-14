@@ -37,10 +37,7 @@ local palettes = {
   { "#9BBC0F", "#8BAC0F", "#306230", "#0F380F" }, -- dmg
   { "#FFFFFF", "#b6b6b6", "#676767", "#000000" }, -- gray
   { "#fff6d3", "#f9a875", "#eb6b6f", "#7c3f58" }, -- ice cream
-  { "#9775a6", "#683a68", "#412752", "#2d162c" }, -- velvet cherry
   { "#ffffff", "#f0d063", "#d075b7", "#442d6e" }, -- dream candy
-  { "#f8fbf3", "#cc3385", "#6e1fb1", "#000000" }, -- ???
-  { "#e7edeb", "#8ecece", "#62a1c7", "#3f6ecc" },
 }
 
 local function parse_color(rgba)

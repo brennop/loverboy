@@ -294,6 +294,32 @@ local function push_r16(registers)
   memory:set(cpu.sp + 1, cpu[registers[1]])
 end
 
+local function daa()
+  local correction = 0
+  local set_carry = false
+
+  local half = band(cpu.f, 0x20) == 0x20
+  local carry = band(cpu.f, 0x10) == 0x10
+  local not_sub = band(cpu.f, 0x40) == 0x00
+
+  if half or (not_sub and band(cpu.a, 0xf) > 9) then
+    correction = 6
+  end
+
+  if carry or (not_sub and cpu.a > 0x99) then
+    correction = correction + 0x60
+    set_carry = true
+  end
+
+  if not_sub then
+    cpu.a = band(cpu.a + correction, 0xff)
+  else
+    cpu.a = band(cpu.a - correction, 0xff)
+  end
+
+  set_flags(cpu.a, not not_sub, false, set_carry)
+end
+
 --
 -- cb
 --
@@ -396,7 +422,7 @@ local instructions = {
   { 0x24, "INC H",        1, 4,  inc_r8,     "h" },
   { 0x25, "DEC H",        1, 4,  dec_r8,     "h" },
   { 0x26, "LD H, d8",     2, 8,  ld_r8_nn,   "h" },
-  { 0x27, "DAA ",         1, 4,  nil,        nil },
+  { 0x27, "DAA ",         1, 4,  daa,        nil },
   { 0x28, "JR Z, r8",     2, 8,  jr_flag_r8, { 0x80,   0x80 } },
   { 0x29, "ADD HL, HL",   1, 8,  add_hl_r16, hl },
   { 0x2A, "LD A, HL",     1, 8,  ld_r8_mem,  { "a", hli } },
