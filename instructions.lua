@@ -37,6 +37,20 @@ local function hl()
 	return bor(lshift(cpu.h, 0x8), cpu.l)
 end
 
+local function hli()
+  local value = bor(lshift(cpu.h, 0x8), cpu.l)
+  cpu.h = band(rshift(value + 1, 0x8), 0xff)
+  cpu.l = band(value + 1, 0xff)
+  return value
+end
+
+local function hld()
+  local value = bor(lshift(cpu.h, 0x8), cpu.l)
+  cpu.h = band(rshift(value - 1, 0x8), 0xff)
+  cpu.l = band(value - 1, 0xff)
+  return value
+end
+
 local function sp()
   return cpu.sp
 end
@@ -80,8 +94,18 @@ local function ld_sp_d16()
 	cpu.sp = nnn()
 end
 
+-- param:
+--  data[1] = getter to address
+--  data[2] = register to get
 local function ld_mem_r8(data)
   memory:set(data[1](), cpu[data[2]])
+end
+
+-- param:
+--  data[1] = register to set
+--  data[2] = getter to address
+local function ld_r8_mem(data)
+  cpu[data[1]] = memory:get(data[2]())
 end
 
 -- arith
@@ -123,10 +147,6 @@ local function ld_r8_nn(register)
   cpu[register] = memory:get(cpu.pc - 1)
 end
 
-local function ld_hl_nn()
-  memory:set(compose(cpu.h, cpu.l), memory:get(cpu.pc - 1))
-end
-
 local function add_hl_r16(source)
   local value = source()
   local _hl = hl()
@@ -140,20 +160,6 @@ local function add_hl_r16(source)
 
   cpu.l = band(result, 0xff)
   cpu.h = band(rshift(result, 0x08), 0xff)
-end
-
-local function ld_hl_a(inc)
-  local address = hl()
-  memory:set(address, cpu.a)
-  cpu.h = band(rshift(address + inc, 0x8), 0xff)
-  cpu.l = band(address + inc, 0xff)
-end
-
-local function ld_a_hl(inc)
-  local address = hl()
-  cpu.a = memory:get(address)
-  cpu.h = band(rshift(address + inc, 0x8), 0xff)
-  cpu.l = band(address + inc, 0xff)
 end
 
 local function dec_sp()
@@ -249,11 +255,12 @@ local function cb()
     cpu.f = bor(band(value, bit(opcode)) == 0 and 0x80 or 0, 0x20, band(cpu.f, 0x10))
     return
   elseif range == 2 then
-  else
+  elseif range == 3 then
+    cpu[register] = bor(value, bit(opcode))
+    return
   end
 
-  cpu[register] = value
-  print(string.format("unknown cb instruction: 0x%02x, at PC:0x%04x", opcode, cpu.pc))
+  print(string.format("unknown cb instruction: 0x%02x, at PC:0x%04x", opcode, cpu.pc - 2))
 end
 
 -- [[
@@ -271,7 +278,7 @@ local instructions = {
   { 0x07, "RLCA ",        1, 4,  nil,        nil },
   { 0x08, "LD a16, SP",   3, 20, nil,        nil },
   { 0x09, "ADD HL, BC",   1, 8,  add_hl_r16,  bc },
-  { 0x0A, "LD A, BC",     1, 8,  nil,        nil },
+  { 0x0A, "LD A, BC",     1, 8,  ld_r8_mem,   { "a", bc } },
   { 0x0B, "DEC BC",       1, 8,  dec_r16,    { "b", "c" } },
   { 0x0C, "INC C",        1, 4,  inc_r8,     "c" },
   { 0x0D, "DEC C",        1, 4,  dec_r8,     "c" },
@@ -287,7 +294,7 @@ local instructions = {
   { 0x17, "RLA ",         1, 4,  nil,        nil },
   { 0x18, "JR r8",        2, 12, nil,        nil },
   { 0x19, "ADD HL, DE",   1, 8,  add_hl_r16,  de },
-  { 0x1A, "LD A, DE",     1, 8,  nil,        nil },
+  { 0x1A, "LD A, DE",     1, 8,  ld_r8_mem,  { "a", de } },
   { 0x1B, "DEC DE",       1, 8,  dec_r16,    { "d", "e"} },
   { 0x1C, "INC E",        1, 4,  inc_r8,     "e" },
   { 0x1D, "DEC E",        1, 4,  dec_r8,     "e" },
@@ -295,7 +302,7 @@ local instructions = {
   { 0x1F, "RRA ",         1, 4,  nil,        nil },
   { 0x20, "JR NZ, r8",    2, 8,  jr_flag_r8, { 0x80,   0x00 } },
   { 0x21, "LD HL, d16",   3, 12, ld_r16_d16, { "h",    "l" } },
-  { 0x22, "LD HL, A",     1, 8,  ld_hl_a,    1   },
+  { 0x22, "LD HL, A",     1, 8,  ld_mem_r8,  { hli,  "a" } },
   { 0x23, "INC HL",       1, 8,  inc_r16,    { "h",    "l" } },
   { 0x24, "INC H",        1, 4,  inc_r8,     "h" },
   { 0x25, "DEC H",        1, 4,  dec_r8,     "h" },
@@ -303,7 +310,7 @@ local instructions = {
   { 0x27, "DAA ",         1, 4,  nil,        nil },
   { 0x28, "JR Z, r8",     2, 8,  jr_flag_r8, { 0x80,   0x80 } },
   { 0x29, "ADD HL, HL",   1, 8,  add_hl_r16, hl },
-  { 0x2A, "LD A, HL",     1, 8,  ld_a_hl,    1   },
+  { 0x2A, "LD A, HL",     1, 8,  ld_r8_mem,  { "a", hli } },
   { 0x2B, "DEC HL",       1, 8,  dec_r16,    { "h", "l" } },
   { 0x2C, "INC L",        1, 4,  inc_r8,     "l" },
   { 0x2D, "DEC L",        1, 4,  dec_r8,     "l" },
@@ -311,15 +318,15 @@ local instructions = {
   { 0x2F, "CPL ",         1, 4,  cpl,        nil },
   { 0x30, "JR NC, r8",    2, 8,  jr_flag_r8, { 0x10,   0x00 } },
   { 0x31, "LD SP, d16",   3, 12, ld_sp_d16,  nil },
-  { 0x32, "LD HL, A",     1, 8,  ld_hl_a,    -1  },
+  { 0x32, "LD HL, A",     1, 8,  ld_mem_r8,  { hld, "a" } },
   { 0x33, "INC SP",       1, 8,  nil,        nil },
   { 0x34, "INC HL",       1, 12, inc_r8,     "(hl)" },
   { 0x35, "DEC HL",       1, 12, dec_r8,     "(hl)" },
-  { 0x36, "LD HL, d8",    2, 12, ld_hl_nn,   "(hl)" },
+  { 0x36, "LD HL, d8",    2, 12, ld_mem_r8,  { hl, "nn" } },
   { 0x37, "SCF ",         1, 4,  nil,        nil },
   { 0x38, "JR C, r8",     2, 8,  jr_flag_r8, { 0x10,   0x10 } },
   { 0x39, "ADD HL, SP",   1, 8,  add_hl_r16,  sp },
-  { 0x3A, "LD A, HL",     1, 8,  ld_a_hl,     -1 },
+  { 0x3A, "LD A, HL",     1, 8,  ld_r8_mem,  { "a", hld } },
   { 0x3B, "DEC SP",       1, 8,  dec_sp,     nil },
   { 0x3C, "INC A",        1, 4,  inc_r8,     "a" },
   { 0x3D, "DEC A",        1, 4,  dec_r8,     "a" },
@@ -494,7 +501,7 @@ local instructions = {
   { 0xE6, "AND d8",       2, 8,  and_a_r8,   "nn" },
   { 0xE7, "RST 20H",      1, 16, rst,        0x20 },
   { 0xE8, "ADD SP, r8",   2, 16, nil,        nil },
-  { 0xE9, "JP HL",        1, 4,  nil,        nil },
+  { 0xE9, "JP HL",        1, 4,  function() cpu.pc = hl() end,        nil },
   { 0xEA, "LD a16, A",    3, 16, ld_mem_r8,  { nnn,    "a" } },
   { 0xEB, "ILLEGAL_EB ",  1, 4,  nil,        nil },
   { 0xEC, "ILLEGAL_EC ",  1, 4,  nil,        nil },
@@ -511,7 +518,7 @@ local instructions = {
   { 0xF7, "RST 30H",      1, 16, rst,        0x30 },
   { 0xF8, "LD HL, SP+r8", 2, 12, nil,        nil },
   { 0xF9, "LD SP, HL",    1, 8,  nil,        nil },
-  { 0xFA, "LD A, a16",    3, 16, nil,        nil },
+  { 0xFA, "LD A, a16",    3, 16, ld_r8_mem,  { "a", nnn } },
   { 0xFB, "EI ",          1, 4,  set_ime,    true },
   { 0xFC, "ILLEGAL_FC ",  1, 4,  nil,        nil },
   { 0xFD, "ILLEGAL_FD ",  1, 4,  nil,        nil },
