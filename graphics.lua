@@ -17,10 +17,13 @@ local LYC  = 0xFF45
 local WY   = 0xFF4A
 local WX   = 0xFF4B
 
+local OAM  = 0xFE00
+
 local graphics = {
   cycles = 0,
   mode = "hblank",
-  framebuffer = nil
+  framebuffer = nil,
+  palette = 0,
 }
 
 local modes = {
@@ -30,15 +33,50 @@ local modes = {
   vram   = 3,
 }
 
--- TODO: implement this
-local function get_color(value, palette)
-  local color = 1 - value * 85 / 256
-  return color, color, color
+local palettes = {
+  { "#9BBC0F", "#8BAC0F", "#306230", "#0F380F" }, -- dmg
+  { "#FFFFFF", "#b6b6b6", "#676767", "#000000" }, -- gray
+  { "#fff6d3", "#f9a875", "#eb6b6f", "#7c3f58" }, -- ice cream
+  { "#9775a6", "#683a68", "#412752", "#2d162c" }, -- velvet cherry
+  { "#ffffff", "#f0d063", "#d075b7", "#442d6e" }, -- dream candy
+  { "#f8fbf3", "#cc3385", "#6e1fb1", "#000000" }, -- ???
+  { "#e7edeb", "#8ecece", "#62a1c7", "#3f6ecc" },
+}
+
+local function parse_color(rgba)
+	local rb = tonumber(string.sub(rgba, 2, 3), 16) 
+	local gb = tonumber(string.sub(rgba, 4, 5), 16) 
+	local bb = tonumber(string.sub(rgba, 6, 7), 16)
+	local ab = tonumber(string.sub(rgba, 8, 9), 16) or nil
+  return love.math.colorFromBytes(rb, gb, bb, ab)
+end
+
+for palette in ipairs(palettes) do
+  for index, color in ipairs(palettes[palette]) do
+    palettes[palette][index] = { parse_color(color) }
+  end
+end
+
+function graphics:get_color(value, address)
+  local palette = memory:get(address)
+
+  local low_bit = band(rshift(palette, value * 2), 0x01)
+  local high_bit = band(rshift(palette, value * 2 + 1), 0x01)
+  local index = bor(lshift(high_bit, 1), low_bit)
+  local color = palettes[self.palette][index + 1]
+
+  return color[1], color[2], color[3]
 end
 
 function graphics:init()
   -- TODO: maybe set correct mode from memory?
   self.framebuffer = love.image.newImageData(160, 144)
+
+  self:next_palette()
+end
+
+function graphics:next_palette()
+  self.palette = mod(self.palette, #palettes) + 1
 end
 
 function graphics:update_stat(mode)
@@ -130,7 +168,7 @@ function graphics:render_scanline()
   end
 
   if band(control, 0x02) == 0x02 then
-    -- self:render_sprites()
+    self:render_sprites()
   end
 end
 
@@ -193,9 +231,65 @@ function graphics:render_tiles()
 
     local color_num = bor(lshift(left_bit, 1), right_bit)
 
-    local r, g, b = get_color(color_num)
+    local r, g, b = self:get_color(color_num, 0xff47)
 
     self.framebuffer:setPixel(pixel, scanline, r, g, b, 1)
+  end
+end
+
+function graphics:render_sprites()
+  local lcdc = memory:get(LCDC)
+  local scanline = memory:get(LY)
+
+  local sprite_size = band(lcdc, 0x04) == 0x04 and 16 or 8
+
+  for sprite = 1, 40 do
+    local index = (sprite - 1) * 4
+
+    local y_pos = memory:get(OAM + index) - 16
+    local x_pos = memory:get(OAM + index + 1) - 8
+
+    local tile_location = memory:get(OAM + index + 2)
+    local attributes = memory:get(OAM + index + 3)
+
+    local y_flip = band(attributes, 0x40) == 0x40
+    local x_flip = band(attributes, 0x20) == 0x20
+
+    local palette = band(attributes, 0x10) == 0x10 and 0xff49 or 0xff48
+
+    -- should sprite be drawn on this scanline
+    if scanline >= y_pos and scanline < (y_pos + sprite_size) then
+      local line = scanline - y_pos
+
+      if y_flip then
+        line = sprite_size - line - 1
+      end
+
+      line = lshift(line, 1)
+
+      local address = 0x8000 + tile_location * 16 + line
+      local data_right = memory:get(address)
+      local data_left = memory:get(address + 1)
+
+      for tile_pixel = 7, 0, -1 do
+        local color_bit = tile_pixel
+
+        if x_flip then
+          color_bit = 7 - tile_pixel
+        end
+
+        local color_num = bor(
+          lshift(rshift(band(lshift(1, color_bit), data_left), color_bit), 1),
+          rshift(band(lshift(1, color_bit), data_right), color_bit)
+        )
+
+        local r, g, b = self:get_color(color_num, palette)
+
+        if color_num ~= 0 then
+          self.framebuffer:setPixel(x_pos + (7 - tile_pixel), scanline, r, g, b, 1)
+        end
+      end
+    end
   end
 end
 

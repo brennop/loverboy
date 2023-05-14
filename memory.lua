@@ -1,6 +1,6 @@
 local ffi = require "ffi"
 
-local rshift = bit.rshift
+local rshift, lshift = bit.rshift, bit.lshift
 local bnot, band, bor = bit.bnot, bit.band, bit.bor
 local is_down = love.keyboard.isDown
 
@@ -48,6 +48,19 @@ end
 function memory:set(address, value)
   local range = rshift(address, 12)
 
+  if range < 0x04 then
+    return
+  elseif range < 0x08 then
+    -- TODO
+  elseif range < 0x10 then
+    if address == 0xff46 then
+      local source = lshift(value, 8)
+      for i = 0, 0x9F do
+        self.data[0xFE00 + i] = self.data[source + i]
+      end
+    end
+  end
+
   self.data[address] = value
 end
 
@@ -63,8 +76,8 @@ function memory:get_input()
   end
 
   if band(joypad, 0x20) == 0x20 then
-    if is_down "a" then joypad = bor(joypad, 0x01) end
-    if is_down "b" then joypad = bor(joypad, 0x02) end
+    if is_down "z" then joypad = bor(joypad, 0x01) end
+    if is_down "x" then joypad = bor(joypad, 0x02) end
     if is_down "backspace" then joypad = bor(joypad, 0x04) end
     if is_down "return" then joypad = bor(joypad, 0x08) end
   end
