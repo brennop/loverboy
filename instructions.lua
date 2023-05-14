@@ -321,7 +321,11 @@ local cb_handlers = {
     cpu.f = result == 0 and 0x80 or 0
     return result
   end,
-  nil,
+  function(value) -- SRL
+    local result = rshift(value, 1)
+    set_flags(result, false, false, band(value, 1) == 1)
+    return result
+  end,
 }
 
 local function cb()
