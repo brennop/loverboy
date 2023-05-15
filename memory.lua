@@ -15,16 +15,16 @@ function memory:init(rom)
   self.data = ffi.new("uint8_t[?]", 0x10000)
 
   -- https://gbdev.io/pandocs/Power_Up_Sequence.html#hardware-registers
-  self.data[0xFF00] = 0xCF;
-  self.data[0xFF04] = 0xAB;
-  self.data[0xFF05] = 0x00;
-  self.data[0xFF40] = 0x91;
-  self.data[0xFF41] = 0x85;
-  self.data[0xFF42] = 0x00;
-  self.data[0xFF43] = 0x00;
-  self.data[0xFF45] = 0x00;
-  self.data[0xFF46] = 0xFF;
-  self.data[0xFF47] = 0xFC;
+  self.data[0xFF00] = 0xCF
+  self.data[0xFF04] = 0xAB
+  self.data[0xFF05] = 0x00
+  self.data[0xFF40] = 0x91
+  self.data[0xFF41] = 0x85
+  self.data[0xFF42] = 0x00
+  self.data[0xFF43] = 0x00
+  self.data[0xFF45] = 0x00
+  self.data[0xFF46] = 0xFF
+  self.data[0xFF47] = 0xFC
 
   self.rom_bank = 1
 end
@@ -69,17 +69,33 @@ function memory:get_input()
   local joypad = band(bnot(self.data[0xff00]), 0x30)
 
   if band(joypad, 0x10) == 0x10 then
-    if is_down "right" then joypad = bor(joypad, 0x01) end
-    if is_down "left" then joypad = bor(joypad, 0x02) end
-    if is_down "up" then joypad = bor(joypad, 0x04) end
-    if is_down "down" then joypad = bor(joypad, 0x08) end
+    if is_down "right" then
+      joypad = bor(joypad, 0x01)
+    end
+    if is_down "left" then
+      joypad = bor(joypad, 0x02)
+    end
+    if is_down "up" then
+      joypad = bor(joypad, 0x04)
+    end
+    if is_down "down" then
+      joypad = bor(joypad, 0x08)
+    end
   end
 
   if band(joypad, 0x20) == 0x20 then
-    if is_down "z" then joypad = bor(joypad, 0x01) end
-    if is_down "x" then joypad = bor(joypad, 0x02) end
-    if is_down "backspace" then joypad = bor(joypad, 0x04) end
-    if is_down "return" then joypad = bor(joypad, 0x08) end
+    if is_down "z" then
+      joypad = bor(joypad, 0x01)
+    end
+    if is_down "x" then
+      joypad = bor(joypad, 0x02)
+    end
+    if is_down "backspace" then
+      joypad = bor(joypad, 0x04)
+    end
+    if is_down "return" then
+      joypad = bor(joypad, 0x08)
+    end
   end
 
   return bor(0xC0, band(0x3F, bnot(joypad)))

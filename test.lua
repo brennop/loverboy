@@ -1,15 +1,22 @@
-local json = require "json"
 local cpu = require "cpu"
 local instructions = require "instructions"
+local json = require "json"
 
-local bor, band, bxor, lshift, rshift = bit.bor, bit.band, bit.bxor, bit.lshift, bit.rshift
+local bor, band, bxor, lshift, rshift =
+  bit.bor, bit.band, bit.bxor, bit.lshift, bit.rshift
 
 local memory = { data = {} }
 
-for i = 0, 0x10000 do memory.data[i] = 0 end
+for i = 0, 0x10000 do
+  memory.data[i] = 0
+end
 
-function memory:get(addr) return self.data[addr] end
-function memory:set(addr, value) self.data[addr] = value end
+function memory:get(addr)
+  return self.data[addr]
+end
+function memory:set(addr, value)
+  self.data[addr] = value
+end
 
 local testfolder = "cpu_tests/"
 local testsuite = arg[1]
@@ -80,15 +87,15 @@ local function run_test(test)
   end
 
   -- check registers
-  assert_register("a")
-  assert_register("b")
-  assert_register("c")
-  assert_register("d")
-  assert_register("e")
-  assert_register("h")
-  assert_register("l")
-  assert_register("sp")
-  assert_register("pc")
+  assert_register "a"
+  assert_register "b"
+  assert_register "c"
+  assert_register "d"
+  assert_register "e"
+  assert_register "h"
+  assert_register "l"
+  assert_register "sp"
+  assert_register "pc"
 
   -- check flags
   assert_flag(7, "zero")
@@ -130,7 +137,7 @@ local function run_tests(tests)
     end
 
     if errors >= 10 then
-      print("too many errors, stopping")
+      print "too many errors, stopping"
       os.exit(1)
     end
   end

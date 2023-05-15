@@ -10,14 +10,14 @@ local mod = math.fmod
 
 local LCDC = 0xFF40
 local STAT = 0xFF41
-local SCY  = 0xFF42
-local SCX  = 0xFF43
-local LY   = 0xFF44
-local LYC  = 0xFF45
-local WY   = 0xFF4A
-local WX   = 0xFF4B
+local SCY = 0xFF42
+local SCX = 0xFF43
+local LY = 0xFF44
+local LYC = 0xFF45
+local WY = 0xFF4A
+local WX = 0xFF4B
 
-local OAM  = 0xFE00
+local OAM = 0xFE00
 
 local graphics = {
   cycles = 0,
@@ -29,8 +29,8 @@ local graphics = {
 local modes = {
   hblank = 0,
   vblank = 1,
-  oam    = 2,
-  vram   = 3,
+  oam = 2,
+  vram = 3,
 }
 
 local palettes = {
@@ -41,10 +41,10 @@ local palettes = {
 }
 
 local function parse_color(rgba)
-	local rb = tonumber(string.sub(rgba, 2, 3), 16) 
-	local gb = tonumber(string.sub(rgba, 4, 5), 16) 
-	local bb = tonumber(string.sub(rgba, 6, 7), 16)
-	local ab = tonumber(string.sub(rgba, 8, 9), 16) or nil
+  local rb = tonumber(string.sub(rgba, 2, 3), 16)
+  local gb = tonumber(string.sub(rgba, 4, 5), 16)
+  local bb = tonumber(string.sub(rgba, 6, 7), 16)
+  local ab = tonumber(string.sub(rgba, 8, 9), 16) or nil
   return love.math.colorFromBytes(rb, gb, bb, ab)
 end
 
@@ -220,7 +220,7 @@ function graphics:render_tiles()
     local data_right = memory:get(tile_location + line)
     local data_left = memory:get(tile_location + line + 1)
 
-    local color_bit = (mod(x_pos, 8) - 7) * -1;
+    local color_bit = (mod(x_pos, 8) - 7) * -1
 
     -- combine data
     local left_bit = rshift(band(lshift(1, color_bit), data_left), color_bit)

@@ -32,8 +32,8 @@ local cpu = {
 
 local interrupts = {
   vblank = 0x01,
-  stat   = 0x02,
-  timer  = 0x04,
+  stat = 0x02,
+  timer = 0x04,
   serial = 0x08,
   joypad = 0x10,
 }
@@ -44,13 +44,13 @@ local index = {
   end,
   ["nn"] = function(self)
     return memory:get(self.pc - 1)
-  end
+  end,
 }
 
 local newindex = {
   ["(hl)"] = function(self, value)
     memory:set(bor(lshift(self.h, 8), self.l), value)
-  end
+  end,
 }
 
 function cpu:init(_memory)
@@ -69,17 +69,21 @@ function cpu:init(_memory)
   memory = _memory
 
   setmetatable(self, {
-    __index = function(tbl, key) return index[key](tbl) end,
+    __index = function(tbl, key)
+      return index[key](tbl)
+    end,
     __newindex = function(table, key, value)
       newindex[key](table, value)
-    end
+    end,
   })
 end
 
 function cpu:step()
   self:check_interrupts()
 
-  if self.halt then return 4 end
+  if self.halt then
+    return 4
+  end
 
   cpu.opcode = memory:get(self.pc)
   local instr = instructions[cpu.opcode + 1]
@@ -87,11 +91,20 @@ function cpu:step()
   local bytes, cycles, handler, params = instr[3], instr[4], instr[5], instr[6]
 
   if handler == nil then
-    print(string.format("unknown instruction: 0x%02x, %s at PC:0x%04x", cpu.opcode, instr[2], self.pc))
+    print(
+      string.format(
+        "unknown instruction: 0x%02x, %s at PC:0x%04x",
+        cpu.opcode,
+        instr[2],
+        self.pc
+      )
+    )
     os.exit(1)
   end
 
-  if trace then self:trace(instr) end
+  if trace then
+    self:trace(instr)
+  end
 
   self.pc = self.pc + bytes
 
@@ -141,21 +154,21 @@ end
 
 function cpu:pop()
   local value = bor(memory:get(cpu.sp), lshift(memory:get(cpu.sp + 1), 8))
-  cpu.sp = cpu.sp + 2;
+  cpu.sp = cpu.sp + 2
 
-  return value;
+  return value
 end
 
 function cpu:interrupt(interrupt)
   local interrupt_flag = memory:get(0xFF0F)
-  
+
   memory:set(0xFF0F, bor(interrupt_flag, interrupts[interrupt]))
 
   self.halt = false
 end
 
 function cpu:trace(instruction)
- -- A:00 F:Z-H- BC:0000 DE:0393 HL:ffa8 SP:cfff PC:02f0
+  -- A:00 F:Z-H- BC:0000 DE:0393 HL:ffa8 SP:cfff PC:02f0
   local z = band(cpu.f, 0x80) == 0x80 and "Z" or "-"
   local s = band(cpu.f, 0x40) == 0x40 and "N" or "-"
   local h = band(cpu.f, 0x20) == 0x20 and "H" or "-"
@@ -163,9 +176,22 @@ function cpu:trace(instruction)
   local flags = z .. s .. h .. c
 
   local opcode = memory:get(self.pc)
-  print(string.format("A:%02X F:%s BC:%02X%02X DE:%02X%02X HL:%02X%02X SP:%04X PC:%04X | %s",
-    cpu.a, flags, cpu.b, cpu.c, cpu.d, cpu.e, cpu.h, cpu.l, cpu.sp, cpu.pc, instruction[2]
-  ))
+  print(
+    string.format(
+      "A:%02X F:%s BC:%02X%02X DE:%02X%02X HL:%02X%02X SP:%04X PC:%04X | %s",
+      cpu.a,
+      flags,
+      cpu.b,
+      cpu.c,
+      cpu.d,
+      cpu.e,
+      cpu.h,
+      cpu.l,
+      cpu.sp,
+      cpu.pc,
+      instruction[2]
+    )
+  )
 end
 
 return cpu

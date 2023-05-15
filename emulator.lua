@@ -1,9 +1,9 @@
 local ffi = require "ffi"
 
 local cpu = require "cpu"
-local memory = require "memory"
 local graphics = require "graphics"
 local instructions = require "instructions"
+local memory = require "memory"
 
 local band, bor = bit.band, bit.bor
 
@@ -26,7 +26,7 @@ function emulator:init(filename)
   end
 
   file:close()
-  
+
   memory:init(self.rom)
   cpu:init(memory)
   instructions:init(cpu, memory)
