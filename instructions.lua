@@ -320,6 +320,10 @@ local function daa()
   set_flags(cpu.a, not not_sub, false, set_carry)
 end
 
+local function halt()
+  cpu.halt = true
+end
+
 --
 -- cb
 --
@@ -327,8 +331,6 @@ end
 local function bit(opcode)
   return lshift(1, (rshift(band(opcode, 0x38), 3)))
 end
-
-
 
 local cb_handlers = {
   nil,
@@ -375,7 +377,6 @@ local function cb()
   elseif range == 3 then
     cpu[register] = bor(value, bit(opcode))
   end
-
 end
 
 -- [[
@@ -501,7 +502,7 @@ local instructions = {
   { 0x73, "LD HL, E",     1, 8,  ld_r8_r8,        { "(hl)", "e" } },
   { 0x74, "LD HL, H",     1, 8,  ld_r8_r8,        { "(hl)", "h" } },
   { 0x75, "LD HL, L",     1, 8,  ld_r8_r8,        { "(hl)", "l" } },
-  { 0x76, "HALT ",        1, 4,  nil,        nil },
+  { 0x76, "HALT ",        1, 4,  halt,        nil },
   { 0x77, "LD HL, A",     1, 8,  ld_r8_r8,        { "(hl)", "a" } },
   { 0x78, "LD A, B",      1, 4,  ld_r8_r8,   { "a", "b" } },
   { 0x79, "LD A, C",      1, 4,  ld_r8_r8,   { "a", "c" } },

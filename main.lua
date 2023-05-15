@@ -9,9 +9,10 @@ function love.keypressed(key)
   end
 end
 
-function love.load()
+function love.load(args)
   love.graphics.setDefaultFilter("nearest", "nearest")
-  emulator:init("tetris.gb", arg)
+
+  emulator:init(args[1])
 end
 
 function love.update()
