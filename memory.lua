@@ -90,6 +90,10 @@ local mappers = {
         if self.ram_enable then
           self.banks[address - 0xA000 + self.ram_bank * 0x2000] = value
         end
+      elseif range < 0x10 then
+        if address == 0xFF46 then
+          self:dma(value)
+        end
       end
 
       self.data[address] = value
@@ -106,9 +110,6 @@ local mappers = {
           return self.banks[address - 0xA000 + self.ram_bank * 0x2000]
         end
       elseif range < 0x10 then
-        if address == 0xFF46 then
-          self:dma(value)
-        end
         if address == 0xff00 then
           return self:get_input()
         end
