@@ -202,9 +202,26 @@ end
 
 ---
 
-local function rlca(data)
+local function rlca()
   cpu.f = lshift(rshift(cpu.a, 7), 4)
   cpu.a = bor(band(lshift(cpu.a, 1), 0xff), rshift(band(cpu.f, 0x10), 4))
+end
+
+local function rla()
+  local carry = band(cpu.f, 0x10)
+  cpu.f = lshift(rshift(cpu.a, 7), 4)
+  cpu.a = bor(band(lshift(cpu.a, 1), 0xff), rshift(carry, 4))
+end
+
+local function rrca()
+  cpu.f = lshift(band(cpu.a, 0x01), 4)
+  cpu.a = band(bor(rshift(cpu.a, 1), lshift(cpu.a, 7)), 0xff)
+end
+
+local function rra()
+  local carry = band(cpu.f, 0x10)
+  cpu.f = lshift(band(cpu.a, 0x01), 4)
+  cpu.a = bor(rshift(cpu.a, 1), lshift(carry, 3))
 end
 
 local function ld_r8_r8(registers)
@@ -415,7 +432,7 @@ local instructions = {
   { 0x0C, "INC C",        1, 4,  inc_r8,     "c" },
   { 0x0D, "DEC C",        1, 4,  dec_r8,     "c" },
   { 0x0E, "LD C, d8",     2, 8,  ld_r8_nn,   "c" },
-  { 0x0F, "RRCA ",        1, 4,  nil,        nil },
+  { 0x0F, "RRCA ",        1, 4,  rrca,       nil },
   { 0x10, "STOP d8",      2, 4,  nil,        nil },
   { 0x11, "LD DE, d16",   3, 12, ld_r16_d16, { "d",    "e" } },
   { 0x12, "LD DE, A",     1, 8,  ld_mem_r8,  { de,     "a" } },
@@ -423,7 +440,7 @@ local instructions = {
   { 0x14, "INC D",        1, 4,  inc_r8,     "d" },
   { 0x15, "DEC D",        1, 4,  dec_r8,     "d" },
   { 0x16, "LD D, d8",     2, 8,  ld_r8_nn,   "d" },
-  { 0x17, "RLA ",         1, 4,  nil,        nil },
+  { 0x17, "RLA ",         1, 4,  rla,        nil },
   { 0x18, "JR r8",        2, 12, jr_flag_r8, { 0x00,   0x00 } },
   { 0x19, "ADD HL, DE",   1, 8,  add_hl_r16, de },
   { 0x1A, "LD A, DE",     1, 8,  ld_r8_mem,  { "a",    de } },
@@ -431,7 +448,7 @@ local instructions = {
   { 0x1C, "INC E",        1, 4,  inc_r8,     "e" },
   { 0x1D, "DEC E",        1, 4,  dec_r8,     "e" },
   { 0x1E, "LD E, d8",     2, 8,  ld_r8_nn,   "e" },
-  { 0x1F, "RRA ",         1, 4,  nil,        nil },
+  { 0x1F, "RRA ",         1, 4,  rra,        nil },
   { 0x20, "JR NZ, r8",    2, 8,  jr_flag_r8, { 0x80,   0x00 } },
   { 0x21, "LD HL, d16",   3, 12, ld_r16_d16, { "h",    "l" } },
   { 0x22, "LD HL, A",     1, 8,  ld_mem_r8,  { hli,    "a" } },

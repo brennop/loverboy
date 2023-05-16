@@ -99,9 +99,6 @@ local mappers = {
       if range < 0x4 then
         return self.rom[address]
       elseif range < 0x8 then
-        print(self.rom_bank, address - 0x4000 + self.rom_bank * 0x4000,
-        self.rom[address - 0x4000 + self.rom_bank * 0x4000]
-        )
         return self.rom[address - 0x4000 + self.rom_bank * 0x4000]
       elseif range < 0xA then
       elseif range < 0xC then
