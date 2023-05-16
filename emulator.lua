@@ -17,7 +17,7 @@ local emulator = {
 }
 
 function emulator:init(filename)
-  self.rom = ffi.new("uint8_t[?]", 0x8000)
+  self.rom = ffi.new("uint8_t[?]", 0x10000)
 
   local file = io.open(filename, "rb")
 
