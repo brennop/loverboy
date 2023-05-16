@@ -23,7 +23,7 @@ local graphics = {
   cycles = 0,
   mode = "hblank",
   framebuffer = nil,
-  palette = 0,
+  palette = 3,
 }
 
 local modes = {

@@ -29,7 +29,7 @@ local cartridge_types = {
 
 local mappers = {
   rom = {
-    set = function(self,address, value)
+    set = function(self, address, value)
       local range = rshift(address, 12)
 
       if range < 0x04 then
@@ -66,7 +66,7 @@ local mappers = {
       if range < 0x02 then
         self.ram_enable = band(value, 0x0A) == 0x0A
       elseif range < 0x04 then
-        self.rom_bank = bor(band(self.rom_bank), band(value, 0x1F))
+        self.rom_bank = bor(band(self.rom_bank, 0x60), band(value, 0x1F))
       elseif range < 0x06 then
         value = band(value, 0x03) -- lower 2 bits
         if self.bank_mode == "rom" then
@@ -105,9 +105,12 @@ local mappers = {
         if self.ram_enable then
           return self.banks[address - 0xA000 + self.ram_bank * 0x2000]
         end
-      elseif range < 0xE then
+      elseif range < 0x10 then
         if address == 0xFF46 then
           self:dma(value)
+        end
+        if address == 0xff00 then
+          return self:get_input()
         end
       end
 

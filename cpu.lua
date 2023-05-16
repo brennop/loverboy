@@ -175,10 +175,16 @@ function cpu:trace(instruction)
   local c = band(cpu.f, 0x10) == 0x10 and "C" or "-"
   local flags = z .. s .. h .. c
 
+  local data = ""
+
+  for i = 1, instruction[3] do
+    data = data .. string.format("%02x ", memory:get(self.pc + i - 1))
+  end
+
   local opcode = memory:get(self.pc)
   print(
     string.format(
-      "A:%02X F:%s BC:%02X%02X DE:%02X%02X HL:%02X%02X SP:%04X PC:%04X | %s",
+      "A:%02X F:%s BC:%02X%02X DE:%02X%02X HL:%02X%02X SP:%04X PC:%04X | %s %s",
       cpu.a,
       flags,
       cpu.b,
@@ -189,7 +195,8 @@ function cpu:trace(instruction)
       cpu.l,
       cpu.sp,
       cpu.pc,
-      instruction[2]
+      instruction[2],
+      data
     )
   )
 end

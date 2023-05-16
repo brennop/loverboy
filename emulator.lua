@@ -21,7 +21,7 @@ function emulator:init(filename)
 
   local file = io.open(filename, "rb")
 
-  for i = 0, 0x7fff do
+  for i = 0, 0xffff do
     self.rom[i] = file:read(1):byte()
   end
 
