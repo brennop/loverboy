@@ -18,9 +18,8 @@ function memory:set(addr, value)
   self.data[addr] = value
 end
 
-local testfolder = "cpu_tests/"
-local testsuite = arg[1]
-local filepath = testfolder .. testsuite .. ".json"
+local testsuite = string.match(arg[1], "(.*)%.json") or arg[1]
+local filepath = testsuite .. ".json"
 print(filepath)
 
 local file = io.open(filepath, "r")
@@ -55,7 +54,7 @@ local function run_test(test)
 
   local function assert_register(name)
     local expected = tonumber(test.final.cpu[name])
-    local actual = cpu[name]
+    local actual = band(cpu[name], 0xffff)
 
     local message = [[
 

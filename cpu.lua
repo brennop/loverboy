@@ -51,6 +51,10 @@ local newindex = {
   ["(hl)"] = function(self, value)
     memory:set(bor(lshift(self.h, 8), self.l), value)
   end,
+  ["hl"] = function(self, value)
+    self.h = rshift(value, 8)
+    self.l = band(value, 0xff)
+  end,
 }
 
 function cpu:init(_memory)
@@ -106,7 +110,7 @@ function cpu:step()
     self:trace(instr)
   end
 
-  self.pc = self.pc + bytes
+  self.pc = band(self.pc + bytes, 0xffff)
 
   local extra_cycles = handler(params) or 0
 
@@ -125,12 +129,12 @@ function cpu:check_interrupts()
       self.ime = false
 
       -- save pc
-      self:push(cpu.pc)
+      self:push(self.pc)
 
       for index = 1, 5 do
         local mask = lshift(1, index - 1)
         if band(interrupt, mask) ~= 0 then
-          cpu.pc = interrupt_handlers[index]
+          self.pc = interrupt_handlers[index]
           memory:set(IF, band(flags, bxor(mask, 0xff)))
           break
         end

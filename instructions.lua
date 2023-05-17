@@ -130,8 +130,13 @@ local function ld_r16_d16(reg)
   cpu[reg[1]], cpu[reg[2]] = memory:get(cpu.pc - 1), memory:get(cpu.pc - 2)
 end
 
-local function ld_sp_d16()
-  cpu.sp = nnn()
+local function ld_sp(getter)
+  cpu.sp = getter()
+end
+
+local function ld_d16_sp()
+  memory:set(nnn(), band(cpu.sp, 0xff))
+  memory:set(nnn() + 1, rshift(cpu.sp, 0x8))
 end
 
 -- param:
@@ -146,6 +151,15 @@ end
 --  data[2] = getter to address
 local function ld_r8_mem(data)
   cpu[data[1]] = memory:get(data[2]())
+end
+
+local function add_sp(target)
+  local offset = tonumber(cast("int8_t", memory:get(cpu.pc - 1)))
+  local result = band(cpu.sp + offset, 0xffff)
+  local xor = bxor(cpu.sp, offset, result)
+
+  set_flags(1, false, band(xor, 0x10) == 0x10, band(xor, 0x100) == 0x100)
+  cpu[target] = result
 end
 
 -- arith
@@ -173,6 +187,18 @@ local function sub_a_r8(register)
   local result = cpu.a - value
 
   local half = band(band(cpu.a, 0x0f) - band(value, 0x0f), 0x10) == 0x10
+  local carry = band(result, 0x100) == 0x100
+
+  cpu.a = band(result, 0xff)
+  set_flags(result, true, half, carry)
+end
+
+local function sbc_a_r8(register)
+  local carry_value = rshift(band(cpu.f, 0x10), 4)
+  local value = cpu[register]
+  local result = cpu.a - value - carry_value
+
+  local half = band(band(cpu.a, 0x0f) - band(value, 0x0f) - carry_value, 0x10) == 0x10
   local carry = band(result, 0x100) == 0x100
 
   cpu.a = band(result, 0xff)
@@ -283,6 +309,10 @@ local function inc_r8(register)
   set_flags(result, false, band(result, 0xf) == 0x0, band(cpu.f, 0x10) == 0x10)
 end
 
+local function inc_sp()
+  cpu.sp = band(cpu.sp + 1, 0xffff)
+end
+
 local function jr_flag_r8(data)
   local mask, value = data[1], data[2]
   if band(cpu.f, mask) == value then
@@ -348,6 +378,11 @@ end
 
 local function halt()
   cpu.halt = true
+end
+
+local function op_cf(op)
+  local carry = band(op(cpu.f, 0xff), 0x10)
+  cpu.f = bor(band(cpu.f, 0x80), carry)
 end
 
 --
@@ -425,7 +460,7 @@ local instructions = {
   { 0x05, "DEC B",        1, 4,  dec_r8,     "b" },
   { 0x06, "LD B, d8",     2, 8,  ld_r8_nn,   "b" },
   { 0x07, "RLCA ",        1, 4,  rlca,       nil },
-  { 0x08, "LD a16, SP",   3, 20, nil,        nil },
+  { 0x08, "LD a16, SP",   3, 20, ld_d16_sp,  nil },
   { 0x09, "ADD HL, BC",   1, 8,  add_hl_r16, bc },
   { 0x0A, "LD A, BC",     1, 8,  ld_r8_mem,  { "a",    bc } },
   { 0x0B, "DEC BC",       1, 8,  dec_r16,    { "b",    "c" } },
@@ -433,7 +468,7 @@ local instructions = {
   { 0x0D, "DEC C",        1, 4,  dec_r8,     "c" },
   { 0x0E, "LD C, d8",     2, 8,  ld_r8_nn,   "c" },
   { 0x0F, "RRCA ",        1, 4,  rrca,       nil },
-  { 0x10, "STOP d8",      2, 4,  nil,        nil },
+  { 0x10, "STOP d8",      2, 4,  nop,        nil },
   { 0x11, "LD DE, d16",   3, 12, ld_r16_d16, { "d",    "e" } },
   { 0x12, "LD DE, A",     1, 8,  ld_mem_r8,  { de,     "a" } },
   { 0x13, "INC DE",       1, 8,  inc_r16,    { "d",    "e" } },
@@ -466,13 +501,13 @@ local instructions = {
   { 0x2E, "LD L, d8",     2, 8,  ld_r8_nn,   "l" },
   { 0x2F, "CPL ",         1, 4,  cpl,        nil },
   { 0x30, "JR NC, r8",    2, 8,  jr_flag_r8, { 0x10,   0x00 } },
-  { 0x31, "LD SP, d16",   3, 12, ld_sp_d16,  nil },
+  { 0x31, "LD SP, d16",   3, 12, ld_sp,      nnn },
   { 0x32, "LD HL, A",     1, 8,  ld_mem_r8,  { hld,    "a" } },
-  { 0x33, "INC SP",       1, 8,  nil,        nil },
+  { 0x33, "INC SP",       1, 8,  inc_sp,     nil },
   { 0x34, "INC HL",       1, 12, inc_r8,     "(hl)" },
   { 0x35, "DEC HL",       1, 12, dec_r8,     "(hl)" },
   { 0x36, "LD HL, d8",    2, 12, ld_mem_r8,  { hl,     "nn" } },
-  { 0x37, "SCF ",         1, 4,  nil,        nil },
+  { 0x37, "SCF ",         1, 4,  op_cf,      bor },
   { 0x38, "JR C, r8",     2, 8,  jr_flag_r8, { 0x10,   0x10 } },
   { 0x39, "ADD HL, SP",   1, 8,  add_hl_r16, sp },
   { 0x3A, "LD A, HL",     1, 8,  ld_r8_mem,  { "a",    hld } },
@@ -480,7 +515,7 @@ local instructions = {
   { 0x3C, "INC A",        1, 4,  inc_r8,     "a" },
   { 0x3D, "DEC A",        1, 4,  dec_r8,     "a" },
   { 0x3E, "LD A, d8",     2, 8,  ld_r8_nn,   "a" },
-  { 0x3F, "CCF ",         1, 4,  nil,        nil },
+  { 0x3F, "CCF ",         1, 4,  op_cf,      bxor },
   { 0x40, "LD B, B",      1, 4,  ld_r8_r8,   { "b",    "b" } },
   { 0x41, "LD B, C",      1, 4,  ld_r8_r8,   { "b",    "c" } },
   { 0x42, "LD B, D",      1, 4,  ld_r8_r8,   { "b",    "d" } },
@@ -569,14 +604,14 @@ local instructions = {
   { 0x95, "SUB L",        1, 4,  sub_a_r8,   "l" },
   { 0x96, "SUB HL",       1, 8,  sub_a_r8,   "(hl)" },
   { 0x97, "SUB A",        1, 4,  sub_a_r8,   "a" },
-  { 0x98, "SBC A, B",     1, 4,  nil,        nil },
-  { 0x99, "SBC A, C",     1, 4,  nil,        nil },
-  { 0x9A, "SBC A, D",     1, 4,  nil,        nil },
-  { 0x9B, "SBC A, E",     1, 4,  nil,        nil },
-  { 0x9C, "SBC A, H",     1, 4,  nil,        nil },
-  { 0x9D, "SBC A, L",     1, 4,  nil,        nil },
-  { 0x9E, "SBC A, HL",    1, 8,  nil,        nil },
-  { 0x9F, "SBC A, A",     1, 4,  nil,        nil },
+  { 0x98, "SBC A, B",     1, 4,  sbc_a_r8,   "b" },
+  { 0x99, "SBC A, C",     1, 4,  sbc_a_r8,   "c" },
+  { 0x9A, "SBC A, D",     1, 4,  sbc_a_r8,   "d" },
+  { 0x9B, "SBC A, E",     1, 4,  sbc_a_r8,   "e" },
+  { 0x9C, "SBC A, H",     1, 4,  sbc_a_r8,   "h" },
+  { 0x9D, "SBC A, L",     1, 4,  sbc_a_r8,   "l" },
+  { 0x9E, "SBC A, HL",    1, 8,  sbc_a_r8,   "(hl)" },
+  { 0x9F, "SBC A, A",     1, 4,  sbc_a_r8,   "a" },
   { 0xA0, "AND B",        1, 4,  and_a_r8,   "b" },
   { 0xA1, "AND C",        1, 4,  and_a_r8,   "c" },
   { 0xA2, "AND D",        1, 4,  and_a_r8,   "d" },
@@ -623,7 +658,7 @@ local instructions = {
   { 0xCB, "PREFIX ",      2, 4,  cb,         nil },
   { 0xCC, "CALL Z, a16",  3, 12, jp_cond,    push },
   { 0xCD, "CALL a16",     3, 24, jp_nnn,     true },
-  { 0xCE, "ADC A, d8",    2, 8,  nil,        nil },
+  { 0xCE, "ADC A, d8",    2, 8,  adc_a_r8,   "nn" },
   { 0xCF, "RST 08H",      1, 16, rst,        0x08 },
   { 0xD0, "RET NC",       1, 8,  jp_cond,    pop },
   { 0xD1, "POP DE",       1, 12, pop_r16,    { "d",    "e" } },
@@ -639,7 +674,7 @@ local instructions = {
   { 0xDB, "ILLEGAL_DB ",  1, 4,  nil,        nil },
   { 0xDC, "CALL C, a16",  3, 12, jp_cond,    push },
   { 0xDD, "ILLEGAL_DD ",  1, 4,  nil,        nil },
-  { 0xDE, "SBC A, d8",    2, 8,  nil,        nil },
+  { 0xDE, "SBC A, d8",    2, 8,  sbc_a_r8,   "nn" },
   { 0xDF, "RST 18H",      1, 16, rst,        0x18 },
   { 0xE0, "LDH a8, A",    2, 12, write_io,   nn },
   { 0xE1, "POP HL",       1, 12, pop_r16,    { "h",    "l" } },
@@ -649,7 +684,7 @@ local instructions = {
   { 0xE5, "PUSH HL",      1, 16, push_r16,   { "h",    "l" } },
   { 0xE6, "AND d8",       2, 8,  and_a_r8,   "nn" },
   { 0xE7, "RST 20H",      1, 16, rst,        0x20 },
-  { 0xE8, "ADD SP, r8",   2, 16, nil,        nil },
+  { 0xE8, "ADD SP, r8",   2, 16, add_sp,     "sp" },
   { 0xE9, "JP HL",        1, 4,  jp_hl,      nil },
   { 0xEA, "LD a16, A",    3, 16, ld_mem_r8,  { nnn,    "a" } },
   { 0xEB, "ILLEGAL_EB ",  1, 4,  nil,        nil },
@@ -665,8 +700,8 @@ local instructions = {
   { 0xF5, "PUSH AF",      1, 16, push_r16,   { "a",    "f" } },
   { 0xF6, "OR d8",        2, 8,  or_a_r8,    "nn" },
   { 0xF7, "RST 30H",      1, 16, rst,        0x30 },
-  { 0xF8, "LD HL, SP+r8", 2, 12, nil,        nil },
-  { 0xF9, "LD SP, HL",    1, 8,  nil,        nil },
+  { 0xF8, "LD HL, SP+r8", 2, 12, add_sp,     "hl" },
+  { 0xF9, "LD SP, HL",    1, 8,  ld_sp,      hl },
   { 0xFA, "LD A, a16",    3, 16, ld_r8_mem,  { "a",    nnn } },
   { 0xFB, "EI ",          1, 4,  set_ime,    true },
   { 0xFC, "ILLEGAL_FC ",  1, 4,  nil,        nil },
