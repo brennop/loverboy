@@ -2,6 +2,6 @@
 *.log
 
 json.lua
-cpu_tests/
+cpu_tests
 
 debugger.lua
