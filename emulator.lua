@@ -17,11 +17,13 @@ local emulator = {
 }
 
 function emulator:init(filename)
-  self.rom = ffi.new("uint8_t[?]", 0x10000)
-
   local file = io.open(filename, "rb")
+  local size = file:seek("end")
+  file:seek("set")
 
-  for i = 0, 0xffff do
+  self.rom = ffi.new("uint8_t[?]", size)
+
+  for i = 0, size - 1 do
     self.rom[i] = file:read(1):byte()
   end
 

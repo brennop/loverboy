@@ -359,17 +359,42 @@ local function bit(opcode)
 end
 
 local cb_handlers = {
-  nil,
-  nil,
-  nil,
-  nil,
-  function(value) -- SLA
-    local carry = rshift(value, 7)
-    value = lshift(value, 1)
-    set_flags(value, false, false, carry == 1)
-    return value
+  function(value) -- 0x01 .. 0x07 (RLC)
+    local carry = band(value, 0x80)
+    local result = bor(lshift(value, 1), rshift(carry, 7))
+    set_flags(result, false, false, carry == 0x80)
+    return result
   end,
-  nil,
+  function(value) -- 0x08 .. 0x0f (RRC)
+    local carry = band(value, 0x01)
+    local result = bor(rshift(value, 1), lshift(carry, 7))
+    set_flags(result, false, false, carry == 0x01)
+    return result
+  end,
+  function(value) -- 0x10 .. 0x17 (RL)
+    local carry = band(value, 0x80)
+    local result = bor(lshift(value, 1), band(rshift(cpu.f, 4), 1))
+    set_flags(result, false, false, carry == 0x80)
+    return result
+  end,
+  function(value) -- 0x18 .. 0x1f (RR)
+    local carry = band(value, 0x01)
+    local result = bor(rshift(value, 1), lshift(band(cpu.f, 0x10), 3))
+    set_flags(result, false, false, carry == 0x01)
+    return result
+  end,
+  function(value) -- 0x20 .. 0x27 (SLA)
+    local carry = rshift(value, 7)
+    local result = lshift(value, 1)
+    set_flags(result, false, false, carry == 0x01)
+    return result
+  end,
+  function(value) -- 0x28 .. 0x2f (SRA)
+    local carry = band(value, 0x01)
+    local result = bor(rshift(value, 1), band(value, 0x80))
+    set_flags(result, false, false, carry == 0x01)
+    return result
+  end,
   function(value) -- SWAP
     local result = bor(lshift(band(value, 0xf), 4), rshift(band(value, 0xf0), 4))
     cpu.f = result == 0 and 0x80 or 0
@@ -391,16 +416,6 @@ local function cb()
 
   if range == 0 then
     local handler = cb_handlers[rshift(opcode, 3) + 1]
-    if handler == nil then
-      print(
-        string.format(
-          "unknown cb instruction: 0x%02x, at PC:0x%04x",
-          opcode,
-          cpu.pc - 2
-        )
-      )
-      os.exit(1)
-    end
     cpu[register] = handler(value, carry)
   elseif range == 1 then -- BIT
     cpu.f = bor(band(value, bit(opcode)) == 0 and 0x80 or 0, 0x20, band(cpu.f, 0x10))
