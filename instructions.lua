@@ -344,6 +344,12 @@ local function pop_r16(registers)
   cpu.sp = cpu.sp + 2
 end
 
+local function pop_af()
+  cpu.f = band(memory:get(cpu.sp), 0xf0)
+  cpu.a = memory:get(cpu.sp + 1)
+  cpu.sp = cpu.sp + 2
+end
+
 local function push_r16(registers)
   cpu.sp = cpu.sp - 2
   memory:set(cpu.sp, cpu[registers[2]])
@@ -708,7 +714,7 @@ local instructions = {
   { 0xEE, "XOR d8",       2, 8,  xor_a_r8,   "nn" },
   { 0xEF, "RST 28H",      1, 16, rst,        0x28 },
   { 0xF0, "LDH A, a8",    2, 12, read_io,    nn },
-  { 0xF1, "POP AF",       1, 12, pop_r16,    { "a",    "f" } },
+  { 0xF1, "POP AF",       1, 12, pop_af,     nil },
   { 0xF2, "LD A, C",      1, 8,  read_io,    c },
   { 0xF3, "DI ",          1, 4,  set_ime,    false },
   { 0xF4, "ILLEGAL_F4 ",  1, 4,  nil,        nil },

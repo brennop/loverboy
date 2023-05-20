@@ -188,7 +188,7 @@ function cpu:trace(instruction)
   local opcode = memory:get(self.pc)
   print(
     string.format(
-      "A:%02X F:%s BC:%02X%02X DE:%02X%02X HL:%02X%02X SP:%04X PC:%04X | %s %s",
+      "A:%02X F:%s BC:%02X%02X DE:%02X%02X HL:%02X%02X SP:%04X PC:%04X | %s [%s]",
       cpu.a,
       flags,
       cpu.b,
@@ -201,6 +201,30 @@ function cpu:trace(instruction)
       cpu.pc,
       instruction[2],
       data
+    )
+  )
+end
+
+function cpu:trace_2()
+  -- format:
+  -- A:00 F:11 B:22 C:33 D:44 E:55 H:66 L:77 SP:8888 PC:9999 PCMEM:AA,BB,CC,DD
+  print(
+    string.format(
+      "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X",
+      cpu.a,
+      cpu.f,
+      cpu.b,
+      cpu.c,
+      cpu.d,
+      cpu.e,
+      cpu.h,
+      cpu.l,
+      cpu.sp,
+      cpu.pc,
+      memory:get(cpu.pc),
+      memory:get(cpu.pc + 1),
+      memory:get(cpu.pc + 2),
+      memory:get(cpu.pc + 3)
     )
   )
 end

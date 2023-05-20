@@ -12,6 +12,7 @@ end
 function love.load(args)
   love.graphics.setDefaultFilter("nearest", "nearest")
 
+  -- trace = true
   emulator:init(args[1])
 end
 

@@ -4,7 +4,7 @@ local memory = require "memory"
 local ffi = require "ffi"
 local cast = ffi.cast
 
-local band, bor = bit.band, bit.bor
+local band, bor, bnot = bit.band, bit.bor, bit.bnot
 local rshift, lshift = bit.rshift, bit.lshift
 local mod = math.fmod
 
@@ -66,8 +66,9 @@ function graphics:get_color(value, address)
 end
 
 function graphics:init()
-  -- TODO: maybe set correct mode from memory?
   self.framebuffer = love.image.newImageData(160, 144)
+
+  self.mode = "vblank"
 
   self:next_palette()
 end
@@ -88,7 +89,8 @@ function graphics:update_stat(mode)
     cpu:conditional_interrupt("stat", status, 0x40)
   else
     -- unset coincidence (~0x04)
-    status = band(status, 0xFB)
+    -- status = band(status, 0xFB)
+    status = band(status, bnot(0x04))
   end
 
   memory:set(STAT, bor(status, modes[mode]))
@@ -184,10 +186,8 @@ function graphics:render_tiles()
   local using_window = window_enabled and window_y <= scanline
 
   -- which tile data are we using
-  local unsigned = band(lcdc, 0x10)
-  local is_unsigned = unsigned == 0x10
-  -- unsigned: 0x10 | 0x00; unsigned << 7: 0x800 | 0x000
-  local tile_data = 0x8800 - lshift(unsigned, 7)
+  local is_unsigned = band(lcdc, 0x10) == 0x10
+  local tile_data = is_unsigned and 0x8000 or 0x8800
 
   -- which bg memory
   local mask = using_window and 0x40 or 0x08
@@ -201,26 +201,26 @@ function graphics:render_tiles()
     local x_pos = pixel + scroll_x
 
     if using_window and pixel >= window_x then
-      xpos = pixel - window_x
+      x_pos = pixel - window_x
     end
 
-    local tile_col = rshift(x_pos, 3)
+    local tile_col = band(rshift(x_pos, 3), 0x1F)
 
     local tile_address = background_memory + tile_row + tile_col
     local tile_num = memory:get(tile_address)
 
     if not is_unsigned then
-      tile_num = cast("int8_t", tile_num)
+      tile_num = tonumber(cast("int8_t", tile_num) + 128)
     end
 
-    local sub = lshift(unsigned, 3)
-    local tile_location = tile_data + (tile_num + 128 - sub) * 16
+    local tile_location = tile_data + tile_num * 16
 
-    local line = lshift(mod(y_pos, 8), 1)
+    local line = mod(y_pos, 8) * 2
+
     local data_right = memory:get(tile_location + line)
     local data_left = memory:get(tile_location + line + 1)
 
-    local color_bit = (mod(x_pos, 8) - 7) * -1
+    local color_bit = 7 - mod(x_pos, 8)
 
     -- combine data
     local left_bit = rshift(band(lshift(1, color_bit), data_left), color_bit)
@@ -230,7 +230,9 @@ function graphics:render_tiles()
 
     local r, g, b = self:get_color(color_num, 0xff47)
 
-    self.framebuffer:setPixel(pixel, scanline, r, g, b, 1)
+    if scanline >= 0 and scanline < 144 then
+      self.framebuffer:setPixel(pixel, scanline, r, g, b, 1)
+    end
   end
 end
 
@@ -282,8 +284,9 @@ function graphics:render_sprites()
 
         local r, g, b = self:get_color(color_num, palette)
 
-        if color_num ~= 0 then
-          self.framebuffer:setPixel(x_pos + (7 - tile_pixel), scanline, r, g, b, 1)
+        local x = x_pos + (7 - tile_pixel)
+        if color_num ~= 0 and x >= 0 and x < 160 and scanline >= 0 and scanline < 144 then
+          self.framebuffer:setPixel(x, scanline, r, g, b, 1)
         end
       end
     end
