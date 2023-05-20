@@ -3,10 +3,12 @@ local ffi = require "ffi"
 local rshift, lshift = bit.rshift, bit.lshift
 local bnot, band, bor = bit.bnot, bit.band, bit.bor
 local is_down = love.keyboard.isDown
+local max = math.max
 
 local memory = {
   data = nil,
   rom = nil,
+  banks = nil,
   rom_bank = 0,
   ram_bank = 0,
   ram_enable = false,
@@ -116,13 +118,59 @@ local mappers = {
       end
 
       return self.data[address]
-    end
+    end,
+  },
+  mbc3 = {
+    set = function (self, address, value)
+      local range = rshift(address, 12)
+      if range < 0x02 then
+        self.ram_enable = band(value, 0x0A) == 0x0A
+      elseif range < 0x04 then
+        self.rom_bank = max(band(value, 0x7F), 1)
+      elseif range < 0x06 then
+        self.ram_bank = value
+      elseif range < 0x08 then
+        -- rtc latch
+      elseif range < 0xA then
+        -- vram
+      elseif range < 0xC then
+        if self.ram_enable then
+          self.banks[address - 0xA000 + self.ram_bank * 0x2000] = value
+        end
+      elseif range < 0x10 then
+        if address == 0xFF46 then
+          self:dma(value)
+        end
+      end
+
+      self.data[address] = value
+    end,
+    get = function(self, address)
+      local range = rshift(address, 12)
+      if range < 0x4 then
+        return self.rom[address]
+      elseif range < 0x8 then
+        return self.rom[address - 0x4000 + self.rom_bank * 0x4000]
+      elseif range < 0xA then
+      elseif range < 0xC then
+        if self.ram_enable then
+          return self.banks[address - 0xA000 + self.ram_bank * 0x2000]
+        end
+      elseif range < 0x10 then
+        if address == 0xff00 then
+          return self:get_input()
+        end
+      end
+
+      return self.data[address]
+    end,
   }
 }
 
 function memory:init(rom)
   self.rom = rom
   self.data = ffi.new("uint8_t[?]", 0x10000)
+  self.banks = ffi.new("uint8_t[?]", 0x8000)
 
   -- https://gbdev.io/pandocs/Power_Up_Sequence.html#hardware-registers
   self.data[0xFF00] = 0xCF
@@ -186,6 +234,10 @@ function memory:init(rom)
 
   local cartridge_type = cartridge_types[rom[0x147]]
   local mapper = mappers[cartridge_type]
+
+  if mapper == nil then
+    error "unsupported cartridge type"
+  end
 
   self.get = mapper.get
   self.set = mapper.set
