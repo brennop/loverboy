@@ -497,7 +497,7 @@ local instructions = {
   { 0x15, "DEC D",        1, 4,  dec_r8,     "d" },
   { 0x16, "LD D, d8",     2, 8,  ld_r8_nn,   "d" },
   { 0x17, "RLA ",         1, 4,  rla,        nil },
-  { 0x18, "JR r8",        2, 12, jr_flag_r8, { 0x00,   0x00 } },
+  { 0x18, "JR r8",        2, 8,  jr_flag_r8, { 0x00,   0x00 } },
   { 0x19, "ADD HL, DE",   1, 8,  add_hl_r16, de },
   { 0x1A, "LD A, DE",     1, 8,  ld_r8_mem,  { "a",    de } },
   { 0x1B, "DEC DE",       1, 8,  dec_r16,    { "d",    "e"} },

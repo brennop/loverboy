@@ -68,7 +68,7 @@ end
 function graphics:init()
   self.framebuffer = love.image.newImageData(160, 144)
 
-  self.mode = "vblank"
+  self.mode = "hblank"
 
   self:next_palette()
 end
@@ -118,6 +118,8 @@ function graphics:step(cycles)
 
     local scanline = memory:get(LY)
 
+    -- print(scanline, cycles, self.cycles, modes[self.mode])
+
     -- TODO: maybe merge ifs
     if self.mode == "oam" then
       if self.cycles >= 80 then
@@ -144,6 +146,7 @@ function graphics:step(cycles)
     elseif self.mode == "vblank" then
       if self.cycles >= 456 then
         self.cycles = self.cycles - 456
+
         memory:set(LY, scanline + 1)
 
         if scanline == 153 then

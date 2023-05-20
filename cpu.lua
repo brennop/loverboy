@@ -114,6 +114,8 @@ function cpu:step()
 
   local extra_cycles = handler(params) or 0
 
+  self.cycles = self.cycles + cycles + extra_cycles
+
   return cycles + extra_cycles
 end
 
@@ -188,7 +190,7 @@ function cpu:trace(instruction)
   local opcode = memory:get(self.pc)
   print(
     string.format(
-      "A:%02X F:%s BC:%02X%02X DE:%02X%02X HL:%02X%02X SP:%04X PC:%04X | %s [%s]",
+      "A:%02X F:%s BC:%02X%02X DE:%02X%02X HL:%02X%02X SP:%04X PC:%04X (cy: %d) | %s [%s]",
       cpu.a,
       flags,
       cpu.b,
@@ -199,6 +201,7 @@ function cpu:trace(instruction)
       cpu.l,
       cpu.sp,
       cpu.pc,
+      self.cycles,
       instruction[2],
       data
     )
