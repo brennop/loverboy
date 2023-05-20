@@ -118,8 +118,6 @@ function graphics:step(cycles)
 
     local scanline = memory:get(LY)
 
-    -- print(scanline, cycles, self.cycles, modes[self.mode])
-
     -- TODO: maybe merge ifs
     if self.mode == "oam" then
       if self.cycles >= 80 then
@@ -196,7 +194,9 @@ function graphics:render_tiles()
   local mask = using_window and 0x40 or 0x08
   local background_memory = band(lcdc, mask) == mask and 0x9C00 or 0x9800
 
-  local y_pos = using_window and scanline - window_y or scroll_y + scanline
+  local y_pos = band(using_window and scanline - window_y or scroll_y + scanline, 0xff)
+
+  -- FIXME: the mask used here is arbitrary, but it works
   local tile_row = lshift(rshift(y_pos, 3), 5)
 
   -- draw each pixel
