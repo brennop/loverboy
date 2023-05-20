@@ -202,7 +202,7 @@ local function sbc_a_r8(register)
   local carry = band(result, 0x100) == 0x100
 
   cpu.a = band(result, 0xff)
-  set_flags(result, true, half, carry)
+  set_flags(band(result, 0xff), true, half, carry)
 end
 
 local function and_a_r8(register)
@@ -281,7 +281,7 @@ local function dec_r16(registers)
   local high, low = registers[1], registers[2]
   cpu[low] = band(cpu[low] - 1, 0xff)
   if cpu[low] == 0xff then
-    cpu[high] = cpu[high] - 1
+    cpu[high] = band(cpu[high] - 1, 0xff)
   end
 end
 
@@ -289,7 +289,7 @@ local function inc_r16(registers)
   local high, low = registers[1], registers[2]
   cpu[low] = band(cpu[low] + 1, 0xff)
   if cpu[low] == 0x00 then
-    cpu[high] = cpu[high] + 1
+    cpu[high] = band(cpu[high] + 1, 0xff)
   end
 end
 
@@ -402,7 +402,7 @@ end
 local cb_handlers = {
   function(value) -- 0x01 .. 0x07 (RLC)
     local carry = band(value, 0x80)
-    local result = bor(lshift(value, 1), rshift(carry, 7))
+    local result = band(bor(lshift(value, 1), rshift(carry, 7)), 0xff)
     set_flags(result, false, false, carry == 0x80)
     return result
   end,
@@ -414,7 +414,7 @@ local cb_handlers = {
   end,
   function(value) -- 0x10 .. 0x17 (RL)
     local carry = band(value, 0x80)
-    local result = bor(lshift(value, 1), band(rshift(cpu.f, 4), 1))
+    local result = band(bor(lshift(value, 1), band(rshift(cpu.f, 4), 1)), 0xff)
     set_flags(result, false, false, carry == 0x80)
     return result
   end,
@@ -426,7 +426,7 @@ local cb_handlers = {
   end,
   function(value) -- 0x20 .. 0x27 (SLA)
     local carry = rshift(value, 7)
-    local result = lshift(value, 1)
+    local result = band(lshift(value, 1), 0xff)
     set_flags(result, false, false, carry == 0x01)
     return result
   end,
