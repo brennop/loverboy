@@ -55,7 +55,10 @@ end
 function emulator:draw()
   love.graphics.draw(self.image, 0, 0, 0, 2, 2)
 
-  self:draw_background()
+  love.graphics.setColor(0, 0, 0)
+  love.graphics.rectangle("fill", 0, 0, 60, 20)
+  love.graphics.setColor(1, 1, 1)
+  love.graphics.print(string.format("FPS: %d", love.timer.getFPS()), 0, 0)
 end
 
 function emulator:draw_background()
