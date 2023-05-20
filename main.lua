@@ -1,3 +1,5 @@
+require "fennel".install()
+
 local emulator = require "emulator"
 local graphics = require "graphics"
 
