@@ -6,8 +6,8 @@
 (local {:rshift r-shift :lshift l-shift :band b-and :bnot b-not :bor b-or} bit)
 (local down? (. love :keyboard :isDown))
 
-(local memory {:data (ffi.new "uint8_t[?]" 0x10000)
-               :banks (ffi.new "uint8_t[?]" 0x8000)
+(local memory {:data nil
+               :banks nil
                :rom-bank 1
                :ram-bank 0
                :ram-enable false
@@ -24,6 +24,8 @@
 (fn memory.init [self rom]
     (tset self :rom rom)
     (tset self :mapper (. cartridge-types (. rom 0x147)))
+    (tset self :data (fcollect [i 0 0x10000] 0xff))
+    (tset self :banks (ffi.new "uint8_t[?]" 0x8000))
     (each [key value (pairs boot)]
       (tset self key value)))
 
@@ -70,19 +72,19 @@
                          (tset self :bank-mode :rom)
                          (tset self :ram-bank 0))))
         (< range 0x0A)
-          (tset self :data address value)
+          (tset self.data address value)
         (< range 0x0C)
           (match self.mapper
             :mbc1 (tset self :banks (+ (* self.ram-bank 0x2000) (- address 0xA000)) value)
             :mbc3 (tset self :banks (+ (* self.ram-bank 0x2000) (- address 0xA000)) value))
         (= address 0xff46)
           (: self :dma value)
-      (tset self :data address value))))
+      (tset self.data address value))))
 
 (fn memory.dma [self value]
   (let [source (l-shift value 8)]
     (for [i 0 0x9f]
-      (tset self :data (+ 0xFE00 i) (. self :data (+ source i))))))
+      (tset self.data (+ 0xFE00 i) (. self :data (+ source i))))))
 
 (fn memory.input [self]
   (let [joypad (-> (. self :data 0xff00) (b-not) (b-and 0x30))
