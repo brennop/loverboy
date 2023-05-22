@@ -23,6 +23,7 @@ local graphics = {
   cycles = 0,
   mode = "hblank",
   framebuffer = nil,
+  bg_priority = {},
   palette = 3,
 }
 
@@ -69,6 +70,13 @@ function graphics:init()
   self.framebuffer = love.image.newImageData(160, 144)
 
   self.mode = "hblank"
+
+  for x = 0, 159 do 
+    self.bg_priority[x] = {}
+    for y = 0, 143 do
+      self.bg_priority[x][y] = false
+    end
+  end
 
   self:next_palette()
 end
@@ -196,7 +204,6 @@ function graphics:render_tiles()
 
   local y_pos = band(using_window and scanline - window_y or scroll_y + scanline, 0xff)
 
-  -- FIXME: the mask used here is arbitrary, but it works
   local tile_row = lshift(rshift(y_pos, 3), 5)
 
   -- draw each pixel
@@ -234,9 +241,15 @@ function graphics:render_tiles()
     local r, g, b = self:get_color(color_num, 0xff47)
 
     if scanline >= 0 and scanline < 144 then
+      self.bg_priority[pixel][scanline] = color_num ~= 0
+
       self.framebuffer:setPixel(pixel, scanline, r, g, b, 1)
     end
   end
+end
+
+local function sort_by_x_pos(a, b)
+  return a.x_pos < b.x_pos
 end
 
 function graphics:render_sprites()
@@ -245,14 +258,34 @@ function graphics:render_sprites()
 
   local sprite_size = band(lcdc, 0x04) == 0x04 and 16 or 8
 
+  local sprites_to_draw = {}
+
   for sprite = 1, 40 do
     local index = (sprite - 1) * 4
 
     local y_pos = memory:get(OAM + index) - 16
     local x_pos = memory:get(OAM + index + 1) - 8
-
     local tile_location = memory:get(OAM + index + 2)
     local attributes = memory:get(OAM + index + 3)
+
+    if scanline < y_pos + sprite_size then
+      sprites_to_draw[#sprites_to_draw + 1] = {
+        y_pos = y_pos,
+        x_pos = x_pos,
+        tile_location = tile_location,
+        attributes = attributes,
+      }
+    end
+  end
+
+  -- sort sprites by x_pos
+  table.sort(sprites_to_draw, sort_by_x_pos)
+
+  for _, sprite in ipairs(sprites_to_draw) do
+    local y_pos = sprite.y_pos
+    local x_pos = sprite.x_pos
+    local tile_location = sprite.tile_location
+    local attributes = sprite.attributes
 
     local y_flip = band(attributes, 0x40) == 0x40
     local x_flip = band(attributes, 0x20) == 0x20
@@ -289,7 +322,13 @@ function graphics:render_sprites()
 
         local x = x_pos + (7 - tile_pixel)
         if color_num ~= 0 and x >= 0 and x < 160 and scanline >= 0 and scanline < 144 then
-          self.framebuffer:setPixel(x, scanline, r, g, b, 1)
+          -- check if sprite is behind bg
+          local bg_priority = band(attributes, 0x80) == 0x80
+          local is_bg = self.bg_priority[x][scanline]
+
+          if not bg_priority or not is_bg then
+            self.framebuffer:setPixel(x, scanline, r, g, b, 1)
+          end
         end
       end
     end
