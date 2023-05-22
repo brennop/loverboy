@@ -1,5 +1,5 @@
-# (un)certified loverboy
-a gameboy emulador made with löve
+# (un)certified lover boy
+a game boy emulador made with löve
 
 ![Sun May 14 08:46:36 PM -03 2023](https://github.com/brennop/loverboy/assets/38540987/c84adc10-d394-4978-91f6-4644ca234495)
 ![Sun May 14 08:48:25 PM -03 2023](https://github.com/brennop/loverboy/assets/38540987/68336007-ce86-46b7-a044-c815cef5e8bb)
