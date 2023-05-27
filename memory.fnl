@@ -24,7 +24,7 @@
 (fn memory.init [self rom]
     (tset self :rom rom)
     (tset self :mapper (. cartridge-types (. rom 0x147)))
-    (tset self :data (fcollect [i 0 0x10000] 0xff))
+    (tset self :data (ffi.new "uint8_t[?]" 0x10000))
     (tset self :banks (ffi.new "uint8_t[?]" 0x8000))
     (each [key value (pairs boot)]
       (tset self key value)))

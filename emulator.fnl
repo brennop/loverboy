@@ -12,12 +12,12 @@
 
 (fn load-rom [filename]
   (with-open [file (io.open filename "rb")]
-    (let [data (file:read :*a) 
-          len (length data)
-          rom (ffi.new "uint8_t[?]" len)]
-      (for [i 1 len]
-        (tset rom i (: data :byte i))) 
-      rom)))
+    (let [size (: file :seek :end)
+          buffer (ffi.new "uint8_t[?]" size)]
+      (: file :seek :set)
+      (for [i 0 (- size 1)]
+        (tset buffer i (: (: file :read 1) :byte)))
+      buffer)))
 
 (fn emulator.init [self filename]
   (tset self :rom (load-rom filename))
@@ -39,6 +39,11 @@
   (self.image:replacePixels (. graphics :framebuffer)))
 
 (fn emulator.draw [self]
-  (love.graphics.draw self.image 0 0 0 2 2))
+  (love.graphics.draw self.image 0 0 0 2 2)
+  ;; draw a rectangle for fps
+  (love.graphics.setColor 0 0 0)
+  (love.graphics.rectangle "fill" 0 0 60 20)
+  (love.graphics.setColor 1 1 1)
+  (love.graphics.print (string.format "FPS: %d" (love.timer.getFPS)) 0 0))
 
 emulator
