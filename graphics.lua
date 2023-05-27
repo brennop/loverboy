@@ -24,7 +24,7 @@ local graphics = {
   mode = "hblank",
   framebuffer = nil,
   bg_priority = {},
-  palette = 3,
+  palette = 4,
 }
 
 local modes = {
@@ -35,10 +35,15 @@ local modes = {
 }
 
 local palettes = {
-  { "#9BBC0F", "#8BAC0F", "#306230", "#0F380F" }, -- dmg
-  { "#FFFFFF", "#b6b6b6", "#676767", "#000000" }, -- gray
-  { "#fff6d3", "#f9a875", "#eb6b6f", "#7c3f58" }, -- ice cream
-  { "#ffffff", "#f0d063", "#d075b7", "#442d6e" }, -- dream candy
+  { "#f4f4f4", "#566c86", "#333c57", "#1a1c2c", },
+  { "#f4f4f4", "#41a6f6", "#3b5dc9", "#29366f", },
+  { "#f4f4f4", "#ffcd75", "#ef7d57", "#b13e53", },
+}
+
+local addresses = {
+  0xff47,
+  0xff48,
+  0xff49,
 }
 
 local function parse_color(rgba)
@@ -55,13 +60,14 @@ for palette in ipairs(palettes) do
   end
 end
 
-function graphics:get_color(value, address)
+function graphics:get_color(value, num)
+  local address = addresses[num]
   local palette = memory:get(address)
 
   local low_bit = band(rshift(palette, value * 2), 0x01)
   local high_bit = band(rshift(palette, value * 2 + 1), 0x01)
   local index = bor(lshift(high_bit, 1), low_bit)
-  local color = palettes[self.palette][index + 1]
+  local color = palettes[num][index + 1]
 
   return color[1], color[2], color[3]
 end
@@ -238,7 +244,7 @@ function graphics:render_tiles()
 
     local color_num = bor(lshift(left_bit, 1), right_bit)
 
-    local r, g, b = self:get_color(color_num, 0xff47)
+    local r, g, b = self:get_color(color_num, 1)
 
     if scanline >= 0 and scanline < 144 then
       self.bg_priority[pixel][scanline] = color_num ~= 0
@@ -290,7 +296,7 @@ function graphics:render_sprites()
     local y_flip = band(attributes, 0x40) == 0x40
     local x_flip = band(attributes, 0x20) == 0x20
 
-    local palette = band(attributes, 0x10) == 0x10 and 0xff49 or 0xff48
+    local palette = band(attributes, 0x10) == 0x10 and 3 or 2
 
     -- should sprite be drawn on this scanline
     if scanline >= y_pos and scanline < (y_pos + sprite_size) then
