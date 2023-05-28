@@ -19,6 +19,8 @@ local WX = 0xFF4B
 
 local OAM = 0xFE00
 
+local pointer = nil
+
 local graphics = {
   cycles = 0,
   mode = "hblank",
@@ -34,10 +36,11 @@ local modes = {
   vram = 3,
 }
 
+-- colors are ABGR because it works with the ffi pointer
 local palettes = {
-  { "#f4f4f4", "#566c86", "#333c57", "#1a1c2c", },
-  { "#f4f4f4", "#41a6f6", "#3b5dc9", "#29366f", },
-  { "#f4f4f4", "#ffcd75", "#ef7d57", "#b13e53", },
+  { 0xfff4f4f4, 0xff866c56, 0xff573c33, 0xff2c1c1a, },
+  { 0xfff4f4f4, 0xfff6a641, 0xffc95d3b, 0xff6f3629, },
+  { 0xfff4f4f4, 0xff75cdff, 0xff577def, 0xff533eb1, },
 }
 
 local addresses = {
@@ -46,20 +49,6 @@ local addresses = {
   0xff49,
 }
 
-local function parse_color(rgba)
-  local rb = tonumber(string.sub(rgba, 2, 3), 16)
-  local gb = tonumber(string.sub(rgba, 4, 5), 16)
-  local bb = tonumber(string.sub(rgba, 6, 7), 16)
-  local ab = tonumber(string.sub(rgba, 8, 9), 16) or nil
-  return love.math.colorFromBytes(rb, gb, bb, ab)
-end
-
-for palette in ipairs(palettes) do
-  for index, color in ipairs(palettes[palette]) do
-    palettes[palette][index] = { parse_color(color) }
-  end
-end
-
 function graphics:get_color(value, num)
   local address = addresses[num]
   local palette = memory:get(address)
@@ -67,13 +56,14 @@ function graphics:get_color(value, num)
   local low_bit = band(rshift(palette, value * 2), 0x01)
   local high_bit = band(rshift(palette, value * 2 + 1), 0x01)
   local index = bor(lshift(high_bit, 1), low_bit)
-  local color = palettes[num][index + 1]
 
-  return color[1], color[2], color[3]
+  return palettes[num][index + 1]
 end
 
 function graphics:init()
   self.framebuffer = love.image.newImageData(160, 144)
+  
+  pointer = ffi.cast("uint32_t*", self.framebuffer:getFFIPointer())
 
   self.mode = "hblank"
 
@@ -244,12 +234,12 @@ function graphics:render_tiles()
 
     local color_num = bor(lshift(left_bit, 1), right_bit)
 
-    local r, g, b = self:get_color(color_num, 1)
+    local value = self:get_color(color_num, 1)
 
     if scanline >= 0 and scanline < 144 then
       self.bg_priority[pixel][scanline] = color_num ~= 0
 
-      self.framebuffer:setPixel(pixel, scanline, r, g, b, 1)
+      pointer[pixel + scanline * 160] = value
     end
   end
 end
@@ -324,7 +314,7 @@ function graphics:render_sprites()
           rshift(band(lshift(1, color_bit), data_right), color_bit)
         )
 
-        local r, g, b = self:get_color(color_num, palette)
+        local value = self:get_color(color_num, palette)
 
         local x = x_pos + (7 - tile_pixel)
         if color_num ~= 0 and x >= 0 and x < 160 and scanline >= 0 and scanline < 144 then
@@ -333,7 +323,7 @@ function graphics:render_sprites()
           local is_bg = self.bg_priority[x][scanline]
 
           if not bg_priority or not is_bg then
-            self.framebuffer:setPixel(x, scanline, r, g, b, 1)
+            pointer[x + scanline * 160] = value
           end
         end
       end
