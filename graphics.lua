@@ -6,7 +6,6 @@ local cast = ffi.cast
 
 local band, bor, bnot = bit.band, bit.bor, bit.bnot
 local rshift, lshift = bit.rshift, bit.lshift
-local mod = math.fmod
 
 local LCDC = 0xFF40
 local STAT = 0xFF41
@@ -26,7 +25,6 @@ local graphics = {
   mode = "hblank",
   framebuffer = nil,
   bg_priority = {},
-  palette = 4,
 }
 
 local modes = {
@@ -73,12 +71,6 @@ function graphics:init()
       self.bg_priority[x][y] = false
     end
   end
-
-  self:next_palette()
-end
-
-function graphics:next_palette()
-  self.palette = mod(self.palette, #palettes) + 1
 end
 
 function graphics:update_stat(mode)
@@ -221,18 +213,17 @@ function graphics:render_tiles()
 
     local tile_location = tile_data + tile_num * 16
 
-    local line = mod(y_pos, 8) * 2
+    local line = band(y_pos, 0x07) * 2
 
     local data_right = memory:get(tile_location + line)
     local data_left = memory:get(tile_location + line + 1)
 
-    local color_bit = 7 - mod(x_pos, 8)
+    local color_bit = 7 - band(x_pos, 0x07)
 
-    -- combine data
-    local left_bit = rshift(band(lshift(1, color_bit), data_left), color_bit)
-    local right_bit = rshift(band(lshift(1, color_bit), data_right), color_bit)
-
-    local color_num = bor(lshift(left_bit, 1), right_bit)
+    local color_num = bor(
+      band(rshift(data_right, color_bit), 0x01),
+      band(rshift(data_left, color_bit), 0x01) * 2
+    )
 
     local value = self:get_color(color_num, 1)
 
@@ -245,7 +236,7 @@ function graphics:render_tiles()
 end
 
 local function sort_by_x_pos(a, b)
-  return a.x_pos < b.x_pos
+  return a[2] < b[2]
 end
 
 function graphics:render_sprites()
@@ -257,31 +248,29 @@ function graphics:render_sprites()
   local sprites_to_draw = {}
 
   for sprite = 1, 40 do
-    local index = (sprite - 1) * 4
+    -- the oam scan selects up to 10 visible sprites
+    if #sprites_to_draw == 10 then
+      break
+    end
 
-    local y_pos = memory:get(OAM + index) - 16
-    local x_pos = memory:get(OAM + index + 1) - 8
-    local tile_location = memory:get(OAM + index + 2)
-    local attributes = memory:get(OAM + index + 3)
+    local index = (sprite - 1) * 4 + OAM
 
-    if scanline < y_pos + sprite_size then
-      sprites_to_draw[#sprites_to_draw + 1] = {
-        y_pos = y_pos,
-        x_pos = x_pos,
-        tile_location = tile_location,
-        attributes = attributes,
-      }
+    local y_pos = memory:get(index) - 16
+    local x_pos = memory:get(index + 1) - 8
+
+    if scanline >= y_pos and scanline < (y_pos + sprite_size) then
+      sprites_to_draw[#sprites_to_draw + 1] = { index, x_pos, y_pos }
     end
   end
 
   -- sort sprites by x_pos
   table.sort(sprites_to_draw, sort_by_x_pos)
 
-  for _, sprite in ipairs(sprites_to_draw) do
-    local y_pos = sprite.y_pos
-    local x_pos = sprite.x_pos
-    local tile_location = sprite.tile_location
-    local attributes = sprite.attributes
+  for i = 1, #sprites_to_draw do
+    local sprite = sprites_to_draw[i]
+    local index, x_pos, y_pos = sprite[1], sprite[2], sprite[3]
+    local tile_location = memory:get(index + 2)
+    local attributes = memory:get(index + 3)
 
     local y_flip = band(attributes, 0x40) == 0x40
     local x_flip = band(attributes, 0x20) == 0x20
