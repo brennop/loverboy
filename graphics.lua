@@ -235,10 +235,6 @@ function graphics:render_tiles()
   end
 end
 
-local function sort_by_x_pos(a, b)
-  return a[2] < b[2]
-end
-
 function graphics:render_sprites()
   local lcdc = memory:get(LCDC)
   local scanline = memory:get(LY)
@@ -259,16 +255,17 @@ function graphics:render_sprites()
     local x_pos = memory:get(index + 1) - 8
 
     if scanline >= y_pos and scanline < (y_pos + sprite_size) then
-      sprites_to_draw[#sprites_to_draw + 1] = { index, x_pos, y_pos }
+      sprites_to_draw[#sprites_to_draw + 1] = index
     end
   end
 
   -- sort sprites by x_pos
-  table.sort(sprites_to_draw, sort_by_x_pos)
+  table.sort(sprites_to_draw)
 
   for i = 1, #sprites_to_draw do
-    local sprite = sprites_to_draw[i]
-    local index, x_pos, y_pos = sprite[1], sprite[2], sprite[3]
+    local index = sprites_to_draw[i]
+    local y_pos = memory:get(index) - 16
+    local x_pos = memory:get(index + 1) - 8
     local tile_location = memory:get(index + 2)
     local attributes = memory:get(index + 3)
 
@@ -299,8 +296,8 @@ function graphics:render_sprites()
         end
 
         local color_num = bor(
-          lshift(rshift(band(lshift(1, color_bit), data_left), color_bit), 1),
-          rshift(band(lshift(1, color_bit), data_right), color_bit)
+          band(rshift(data_right, color_bit), 0x01),
+          band(rshift(data_left, color_bit), 0x01) * 2
         )
 
         local value = self:get_color(color_num, palette)
