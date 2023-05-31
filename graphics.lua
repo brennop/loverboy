@@ -34,6 +34,10 @@ local modes = {
   vram = 3,
 }
 
+local function sort_sprites(a, b)
+  return a[2] < b[2]
+end
+
 -- colors are ABGR because it works with the ffi pointer
 local palettes = {
   { 0xfff4f4f4, 0xff866c56, 0xff573c33, 0xff2c1c1a, },
@@ -255,15 +259,15 @@ function graphics:render_sprites()
     local x_pos = memory:get(index + 1) - 8
 
     if scanline >= y_pos and scanline < (y_pos + sprite_size) then
-      sprites_to_draw[#sprites_to_draw + 1] = index
+      sprites_to_draw[#sprites_to_draw + 1] = { index, x_pos }
     end
   end
 
   -- sort sprites by x_pos
-  table.sort(sprites_to_draw)
+  table.sort(sprites_to_draw, sort_sprites)
 
   for i = 1, #sprites_to_draw do
-    local index = sprites_to_draw[i]
+    local index = sprites_to_draw[i][1]
     local y_pos = memory:get(index) - 16
     local x_pos = memory:get(index + 1) - 8
     local tile_location = memory:get(index + 2)
