@@ -17,18 +17,34 @@ local emulator = {
   tima = 0,
 }
 
-function emulator:init(filename)
+local function read_rom(filename)
   local file = io.open(filename, "rb")
-  local size = file:seek("end")
-  file:seek("set")
+  local data = file:read("*a")
+  file:close()
 
-  self.rom = ffi.new("uint8_t[?]", size)
+  -- read zip files
+  if data:sub(1, 2) == "PK" then
+    local filedata = love.filesystem.newFileData(data, filename)
+    love.filesystem.mount(filedata, "rom")
 
-  for i = 0, size - 1 do
-    self.rom[i] = file:read(1):byte()
+    local items = love.filesystem.getDirectoryItems("rom")
+    local item = items[1]
+
+    data = love.filesystem.read("rom/" .. item)
+    love.filesystem.unmount("rom")
   end
 
-  file:close()
+  local rom = ffi.new("uint8_t[?]", #data)
+
+  for i = 1, #data do
+    rom[i - 1] = data:byte(i, i)
+  end
+
+  return rom
+end
+
+function emulator:init(filename)
+  self.rom = read_rom(filename)
 
   memory:init(self.rom)
   cpu:init(memory)
