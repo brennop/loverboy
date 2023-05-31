@@ -75,41 +75,12 @@ end
 function emulator:draw()
   love.graphics.draw(self.image, 0, 0, 0, 2, 2)
 
-  love.graphics.setColor(0, 0, 0)
-  love.graphics.rectangle("fill", 0, 0, 60, 20)
-  love.graphics.setColor(1, 1, 1)
-  love.graphics.print(string.format("FPS: %d", love.timer.getFPS()), 0, 0)
-end
-
-function emulator:draw_background()
-  local x_offset = 160 * 2 + 8
-  local y_offset = 0
-
-  local tiles_per_row = 16
-
-  for tile = 0, 0xff do
-    for row = 0, 0xf, 2 do
-      local left = memory:get(0x8000 + tile * 16 + row)
-      local right = memory:get(0x8000 + tile * 16 + row + 1)
-
-      for col = 0, 7 do
-        local c = 1 - band(bor(
-          -- (left >> (7 - col)) << 1,
-          lshift(rshift(left, 7 - col), 1),
-          -- (right >> (7 - col))
-          rshift(right, 7 - col)
-        ), 0x03) / 3 
-
-        local x = x_offset + (tile % tiles_per_row) * 8 + col
-        local y = y_offset + math.floor(tile / tiles_per_row) * 8 + row / 2
-
-        love.graphics.setColor(c, c, c)
-        love.graphics.points(x, y)
-        love.graphics.setColor(1, 1, 1)
-      end
-    end
+  if show_fps then
+    love.graphics.setColor(0, 0, 0)
+    love.graphics.rectangle("fill", 0, 0, 60, 20)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.print(string.format("FPS: %d", love.timer.getFPS()), 0, 0)
   end
-
 end
 
 -- TODO: maybe create timers object
