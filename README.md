@@ -6,8 +6,8 @@ a game boy emulador made with löve
 
 # features
 
-- runs tetris (only tested game)
-- can change palette
+- MBC1 and MBC3 (no rtc)
+- Game saves
 
 # keymaps
 
@@ -18,4 +18,4 @@ a game boy emulador made with löve
 | <kbd>x</kbd>         | A        |
 | <kbd>z</kbd>         | B        |
 | Arrow Keys           | D-Pad    |
-| <kbd>p</kbd>         | Change Palette    |
+| <kbd>Space</kbd>     | Toggle Boost    |
