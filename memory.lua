@@ -8,6 +8,7 @@ local max = math.max
 local memory = {
   data = nil,
   rom = nil,
+  vram = nil,
   banks = nil,
   rom_bank = 0,
   ram_bank = 0,
@@ -38,6 +39,8 @@ local mappers = {
         return
       elseif range < 0x08 then
         -- TODO
+      elseif range < 0x0A then
+        self.vram[address - 0x8000] = value
       elseif range < 0x10 then
         if address == 0xff46 then
           self:dma(value)
@@ -87,7 +90,7 @@ local mappers = {
           self.ram_bank = 0
         end
       elseif range < 0xA then
-        -- vram
+        self.vram[address - 0x8000] = value
       elseif range < 0xC then
         if self.ram_enable then
           self.banks[address - 0xA000 + self.ram_bank * 0x2000] = value
@@ -132,7 +135,7 @@ local mappers = {
       elseif range < 0x08 then
         -- rtc latch
       elseif range < 0xA then
-        -- vram
+        self.vram[address - 0x8000] = value
       elseif range < 0xC then
         if self.ram_enable then
           self.banks[address - 0xA000 + self.ram_bank * 0x2000] = value
@@ -171,6 +174,7 @@ function memory:init(rom)
   self.rom = rom
   self.data = ffi.new("uint8_t[?]", 0x10000)
   self.banks = ffi.new("uint8_t[?]", 0x8000)
+  self.vram = ffi.new("uint8_t[?]", 0x2000)
 
   -- https://gbdev.io/pandocs/Power_Up_Sequence.html#hardware-registers
   self.data[0xFF00] = 0xCF

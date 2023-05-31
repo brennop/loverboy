@@ -3,6 +3,7 @@ local memory = require "memory"
 
 local ffi = require "ffi"
 local cast = ffi.cast
+local data = nil
 
 local band, bor, bnot = bit.band, bit.bor, bit.bnot
 local rshift, lshift = bit.rshift, bit.lshift
@@ -60,7 +61,9 @@ end
 
 function graphics:init()
   self.framebuffer = love.image.newImageData(160, 144)
-  
+
+  data = memory.vram
+
   pointer = ffi.cast("uint32_t*", self.framebuffer:getFFIPointer())
 
   self.mode = "hblank"
@@ -168,6 +171,10 @@ function graphics:render_scanline()
   end
 end
 
+local function vram(address)
+  return data[address]
+end
+
 function graphics:render_tiles()
   local lcdc = memory:get(LCDC)
   local scanline = memory:get(LY)
@@ -184,11 +191,11 @@ function graphics:render_tiles()
 
   -- which tile data are we using
   local is_unsigned = band(lcdc, 0x10) == 0x10
-  local tile_data = is_unsigned and 0x8000 or 0x8800
+  local tile_data = is_unsigned and 0x0000 or 0x0800
 
   -- which bg memory
   local mask = using_window and 0x40 or 0x08
-  local background_memory = band(lcdc, mask) == mask and 0x9C00 or 0x9800
+  local background_memory = band(lcdc, mask) == mask and 0x1C00 or 0x1800
 
   local y_pos = band(using_window and scanline - window_y or scroll_y + scanline, 0xff)
 
@@ -205,7 +212,7 @@ function graphics:render_tiles()
     local tile_col = band(rshift(x_pos, 3), 0x1F)
 
     local tile_address = background_memory + tile_row + tile_col
-    local tile_num = memory:get(tile_address)
+    local tile_num = vram(tile_address)
 
     if not is_unsigned then
       tile_num = tonumber(cast("int8_t", tile_num) + 128)
@@ -215,8 +222,8 @@ function graphics:render_tiles()
 
     local line = band(y_pos, 0x07) * 2
 
-    local data_right = memory:get(tile_location + line)
-    local data_left = memory:get(tile_location + line + 1)
+    local data_right = vram(tile_location + line)
+    local data_left = vram(tile_location + line + 1)
 
     local color_bit = 7 - band(x_pos, 0x07)
 
