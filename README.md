@@ -1,8 +1,9 @@
 # (un)certified lover boy
 a game boy emulador made with löve
 
-![Sun May 14 08:46:36 PM -03 2023](https://github.com/brennop/loverboy/assets/38540987/c84adc10-d394-4978-91f6-4644ca234495)
-![Sun May 14 08:48:25 PM -03 2023](https://github.com/brennop/loverboy/assets/38540987/68336007-ce86-46b7-a044-c815cef5e8bb)
+![Wed May 31 04:46:00 PM -03 2023](https://github.com/brennop/loverboy/assets/38540987/12495c2e-3bc8-4bb9-b228-ce3c3929942b)
+![Wed May 31 04:47:48 PM -03 2023](https://github.com/brennop/loverboy/assets/38540987/33de1e85-e4b6-498a-ac61-a757ea4c6668)
+
 
 # features
 
