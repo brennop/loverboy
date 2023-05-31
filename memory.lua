@@ -167,10 +167,14 @@ local mappers = {
   }
 }
 
-function memory:init(rom)
+function memory:init(rom, save)
   self.rom = rom
   self.data = ffi.new("uint8_t[?]", 0x10000)
   self.banks = ffi.new("uint8_t[?]", 0x8000)
+
+  if save then
+    ffi.copy(self.banks, save, 0x8000)
+  end
 
   -- https://gbdev.io/pandocs/Power_Up_Sequence.html#hardware-registers
   self.data[0xFF00] = 0xCF

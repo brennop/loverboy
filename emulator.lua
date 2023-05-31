@@ -11,8 +11,9 @@ local lshift, rshift = bit.lshift, bit.rshift
 local freqs = { 1024, 16, 64, 256 }
 
 local emulator = {
-  rom = nil,
+  title = nil,
 
+  boost = 1,
   div = 0,
   tima = 0,
 }
@@ -35,18 +36,21 @@ local function read_rom(filename)
   end
 
   local rom = ffi.new("uint8_t[?]", #data)
+  local title = data:sub(0x135, 0x143)
 
-  for i = 1, #data do
-    rom[i - 1] = data:byte(i, i)
-  end
+  ffi.copy(rom, data)
 
-  return rom
+  return rom, title
 end
 
 function emulator:init(filename)
-  self.rom = read_rom(filename)
+  local rom, title = read_rom(filename)
 
-  memory:init(self.rom)
+  self.title = title
+
+  local save = emulator:load_ram(title)
+
+  memory:init(rom, save)
   cpu:init(memory)
   instructions:init(cpu, memory)
   graphics:init()
@@ -57,7 +61,7 @@ end
 function emulator:step()
   local cycles_this_update = 0
 
-  while cycles_this_update < 70224 do
+  while cycles_this_update < 70224 * self.boost do
     cycles = cpu:step()
     self:update_timers(cycles)
     graphics:step(cycles)
@@ -138,5 +142,29 @@ function emulator:update_timers(cycles)
     end
   end
 end
+
+function emulator:toggle_boost()
+  if self.boost == 1 then
+    self.boost = 2
+  else
+    self.boost = 1
+  end
+end
+
+function emulator:save_ram()
+  local data = ffi.string(memory.banks, 0x8000)
+  local filename = self.title .. ".sav"
+
+  love.filesystem.write(filename, data)
+end
+
+function emulator:load_ram(title)
+  local filename = title .. ".sav"
+
+  if love.filesystem.getInfo(filename) then
+    return love.filesystem.read(filename)
+  end
+end
+
 
 return emulator
