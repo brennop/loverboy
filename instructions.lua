@@ -108,9 +108,15 @@ local function jp_cond(target)
   if get_flag_condition() then
     cpu.pc = target()
 
-    -- FIXME: jp_flag don't read so much memory
-    -- so they only add 4 cycles instead of 12
     return 12
+  end
+end
+
+local function jp_cond_4(target)
+  if get_flag_condition() then
+    cpu.pc = target()
+
+    return 4
   end
 end
 
@@ -667,7 +673,7 @@ local instructions = {
   { 0xBF, "CP A",         1, 4,  compare,    "a" },
   { 0xC0, "RET NZ",       1, 8,  jp_cond,    pop },
   { 0xC1, "POP BC",       1, 12, pop_r16,    { "b",    "c" } },
-  { 0xC2, "JP NZ, a16",   3, 12, jp_cond,    nnn },
+  { 0xC2, "JP NZ, a16",   3, 12, jp_cond_4,    nnn },
   { 0xC3, "JP a16",       3, 16, jp_nnn,     false },
   { 0xC4, "CALL NZ, a16", 3, 12, jp_cond,    push },
   { 0xC5, "PUSH BC",      1, 16, push_r16,   { "b",    "c" } },
@@ -675,7 +681,7 @@ local instructions = {
   { 0xC7, "RST 00H",      1, 16, rst,        0x00 },
   { 0xC8, "RET Z",        1, 8,  jp_cond,    pop },
   { 0xC9, "RET ",         1, 16, ret,        nil },
-  { 0xCA, "JP Z, a16",    3, 12, jp_cond,    nnn },
+  { 0xCA, "JP Z, a16",    3, 12, jp_cond_4,    nnn },
   { 0xCB, "PREFIX ",      2, 4,  cb,         nil },
   { 0xCC, "CALL Z, a16",  3, 12, jp_cond,    push },
   { 0xCD, "CALL a16",     3, 24, jp_nnn,     true },
@@ -683,7 +689,7 @@ local instructions = {
   { 0xCF, "RST 08H",      1, 16, rst,        0x08 },
   { 0xD0, "RET NC",       1, 8,  jp_cond,    pop },
   { 0xD1, "POP DE",       1, 12, pop_r16,    { "d",    "e" } },
-  { 0xD2, "JP NC, a16",   3, 12, jp_cond,    nnn },
+  { 0xD2, "JP NC, a16",   3, 12, jp_cond_4,    nnn },
   { 0xD3, "ILLEGAL_D3 ",  1, 4,  nil,        nil },
   { 0xD4, "CALL NC, a16", 3, 12, jp_cond,    push },
   { 0xD5, "PUSH DE",      1, 16, push_r16,   { "d",    "e" } },
@@ -691,7 +697,7 @@ local instructions = {
   { 0xD7, "RST 10H",      1, 16, rst,        0x10 },
   { 0xD8, "RET C",        1, 8,  jp_cond,    pop },
   { 0xD9, "RETI ",        1, 16, ret,        true },
-  { 0xDA, "JP C, a16",    3, 12, jp_cond,    nnn },
+  { 0xDA, "JP C, a16",    3, 12, jp_cond_4,    nnn },
   { 0xDB, "ILLEGAL_DB ",  1, 4,  nil,        nil },
   { 0xDC, "CALL C, a16",  3, 12, jp_cond,    push },
   { 0xDD, "ILLEGAL_DD ",  1, 4,  nil,        nil },

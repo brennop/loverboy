@@ -73,7 +73,7 @@ function emulator:step()
 end
 
 function emulator:draw()
-  love.graphics.draw(self.image, 0, 0, 0, 2, 2)
+  love.graphics.draw(self.image, 0, 0, 0, 4, 4)
 
   if show_fps then
     love.graphics.setColor(0, 0, 0)
@@ -85,30 +85,36 @@ end
 
 -- TODO: maybe create timers object
 function emulator:update_timers(cycles)
-  local div = memory:get(0xFF04)
-  local tima = memory:get(0xFF05)
-  local tma = memory:get(0xFF06)
-  local attributes = memory:get(0xFF07)
+  while cycles > 0 do
+    cycles = cycles - 4
 
-  self.div = self.div + cycles
-  if self.div >= 256 then
-    self.div = 0
-    memory:set(0xFF04, div + 1)
-  end
+    local div = memory:get(0xFF04)
+    local tima = memory:get(0xFF05)
+    local tma = memory:get(0xFF06)
+    local tac = memory:get(0xFF07)
 
-  if band(attributes, 0x04) == 0x04 then
-    self.tima = self.tima + cycles
+    self.div = self.div + 4
+    if self.div >= 256 then
+      self.div = 0
+      memory:set(0xFF04, div + 1)
+    end
 
-    local freq = band(attributes, 0x03)
-    local clock_speed = freqs[freq + 1]
+    local carries = self.div ^ div ^ 4
 
-    if self.tima >= clock_speed then
-      self.tima = 0
-      memory:set(0xFF05, band(tima + 1, 0xFF))
+    if band(tac, 0x04) == 0x04 then
+      local freq = band(tac, 0x03)
+      local mask = freqs[freq + 1]
+      local should_increment = band(carries, mask) == mask
 
-      if tima == 0xFF then
-        memory:set(0xFF05, tma)
-        cpu:interrupt "timer"
+      if should_increment then
+        local new_tima, overflow = tima + 1, tima == 0xFF
+
+        if overflow then
+          new_tima = tma
+          cpu:interrupt "timer"
+        end
+
+        memory:set(0xFF05, new_tima)
       end
     end
   end
