@@ -39,9 +39,8 @@
           (. self :data address)
         (< range 0x0C)
           (match self.mapper
-            "rom" (. self :rom address)
-            (where (or :mbc1 :mbc3) (. self :ram_enable))
-            (. self :rom (+ (- address 0xA000) (* self.ram-bank 0x2000)))
+            (where (or :mbc1 :mbc3) (. self :ram-enable))
+            (. self :banks (+ (- address 0xA000) (* self.ram-bank 0x2000)))
             _ 0xff)
         (= address 0xff00)
           (: self :input)
