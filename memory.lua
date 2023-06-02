@@ -115,6 +115,9 @@ local mappers = {
         if address == 0xff00 then
           return self:get_input()
         end
+        if address == 0xff0f then
+          return self.data[address] + 0xe0
+        end
       end
 
       return self.data[address]
@@ -180,7 +183,7 @@ function memory:init(rom, save)
   self.data[0xFF00] = 0xCF
   self.data[0xFF01] = 0x00
   self.data[0xFF02] = 0x7E
-  self.data[0xFF04] = 0xAB
+  self.data[0xFF04] = 0xAC
   self.data[0xFF05] = 0x00
   self.data[0xFF06] = 0x00
   self.data[0xFF07] = 0xF8

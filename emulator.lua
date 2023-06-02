@@ -5,7 +5,7 @@ local graphics = require "graphics"
 local instructions = require "instructions"
 local memory = require "memory"
 
-local band, bor = bit.band, bit.bor
+local band, bor, bxor = bit.band, bit.bor, bit.bxor
 local lshift, rshift = bit.lshift, bit.rshift
 
 local freqs = { 1024, 16, 64, 256 }
@@ -91,22 +91,21 @@ function emulator:update_timers(cycles)
   local attributes = memory:get(0xFF07)
 
   self.div = self.div + cycles
-  if self.div >= 256 then
-    self.div = 0
-    memory:set(0xFF04, div + 1)
+  while self.div >= 256 do
+    self.div = self.div - 256
+    memory:set(0xFF04, band(memory:get(0xff04) + 1, 0xFF))
   end
 
   if band(attributes, 0x04) == 0x04 then
     self.tima = self.tima + cycles
 
-    local freq = band(attributes, 0x03)
-    local clock_speed = freqs[freq + 1]
+    local freq = freqs[band(attributes, 0x03) + 1]
 
-    if self.tima >= clock_speed then
-      self.tima = 0
-      memory:set(0xFF05, band(tima + 1, 0xFF))
+    while self.tima >= freq do
+      self.tima = self.tima - freq
+      memory:set(0xFF05, band(memory:get(0xff05) + 1, 0xFF))
 
-      if tima == 0xFF then
+      if memory:get(0xFF05) == 0 then
         memory:set(0xFF05, tma)
         cpu:interrupt "timer"
       end
