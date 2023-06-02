@@ -16,18 +16,18 @@
         attrs (memory:get 0xFF07)]
     (tset self :div (+ (. self :div) cycles))
 
-    (when (>= (. self :div) 256)
-      (tset self :div 0)
-      (memory:set 0xFF04 (+ div 1)))
+    (while (>= (. self :div) 256)
+      (tset self :div (- (. self :div) 256))
+      (memory:set 0xFF04 (+ (memory:get 0xff04) 1)))
 
     (when (mask? attrs 0x4)
       (tset self :tima (+ (. self :tima) cycles))
-      (let [freq (b-and attrs 0x3)
-            clock (. freqs (+ freq 1))]
-        (when (>= (. self :tima) clock)
-          (tset self :tima 0)
-          (memory:set 0xFF05 (+u8 tima 1))
-          (when (= tima 0xFF)
+      (let [index (b-and attrs 0x3)
+            freq (. freqs (+ index 1))]
+        (while (>= (. self :tima) freq)
+          (tset self :tima (- (. self :tima) freq))
+          (memory:set 0xFF05 (+u8 (memory:get 0xff05) 1))
+          (when (= (memory:get 0xff05) 0x00)
             (memory:set 0xFF05 tma)
             (cpu:interrupt :timer)))))))
 
