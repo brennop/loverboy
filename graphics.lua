@@ -6,7 +6,6 @@ local cast = ffi.cast
 
 local band, bor, bnot = bit.band, bit.bor, bit.bnot
 local rshift, lshift = bit.rshift, bit.lshift
-local mod = math.fmod
 
 local LCDC = 0xFF40
 local STAT = 0xFF41
@@ -19,11 +18,13 @@ local WX = 0xFF4B
 
 local OAM = 0xFE00
 
+local pointer = nil
+
 local graphics = {
   cycles = 0,
   mode = "hblank",
   framebuffer = nil,
-  palette = 3,
+  bg_priority = {},
 }
 
 local modes = {
@@ -33,48 +34,47 @@ local modes = {
   vram = 3,
 }
 
+local function sort_sprites(a, b)
+  return a[2] < b[2]
+end
+
+-- colors are ABGR because it works with the ffi pointer
 local palettes = {
-  { "#9BBC0F", "#8BAC0F", "#306230", "#0F380F" }, -- dmg
-  { "#FFFFFF", "#b6b6b6", "#676767", "#000000" }, -- gray
-  { "#fff6d3", "#f9a875", "#eb6b6f", "#7c3f58" }, -- ice cream
-  { "#ffffff", "#f0d063", "#d075b7", "#442d6e" }, -- dream candy
+  { 0xfff4f4f4, 0xff866c56, 0xff573c33, 0xff2c1c1a, },
+  { 0xfff4f4f4, 0xfff6a641, 0xffc95d3b, 0xff6f3629, },
+  { 0xfff4f4f4, 0xff75cdff, 0xff577def, 0xff533eb1, },
 }
 
-local function parse_color(rgba)
-  local rb = tonumber(string.sub(rgba, 2, 3), 16)
-  local gb = tonumber(string.sub(rgba, 4, 5), 16)
-  local bb = tonumber(string.sub(rgba, 6, 7), 16)
-  local ab = tonumber(string.sub(rgba, 8, 9), 16) or nil
-  return love.math.colorFromBytes(rb, gb, bb, ab)
-end
+local addresses = {
+  0xff47,
+  0xff48,
+  0xff49,
+}
 
-for palette in ipairs(palettes) do
-  for index, color in ipairs(palettes[palette]) do
-    palettes[palette][index] = { parse_color(color) }
-  end
-end
-
-function graphics:get_color(value, address)
+function graphics:get_color(value, num)
+  local address = addresses[num]
   local palette = memory:get(address)
 
   local low_bit = band(rshift(palette, value * 2), 0x01)
   local high_bit = band(rshift(palette, value * 2 + 1), 0x01)
   local index = bor(lshift(high_bit, 1), low_bit)
-  local color = palettes[self.palette][index + 1]
 
-  return color[1], color[2], color[3]
+  return palettes[num][index + 1]
 end
 
 function graphics:init()
   self.framebuffer = love.image.newImageData(160, 144)
+  
+  pointer = ffi.cast("uint32_t*", self.framebuffer:getFFIPointer())
 
   self.mode = "hblank"
 
-  self:next_palette()
-end
-
-function graphics:next_palette()
-  self.palette = mod(self.palette, #palettes) + 1
+  for x = 0, 159 do 
+    self.bg_priority[x] = {}
+    for y = 0, 143 do
+      self.bg_priority[x][y] = false
+    end
+  end
 end
 
 function graphics:update_stat(mode)
@@ -196,7 +196,6 @@ function graphics:render_tiles()
 
   local y_pos = band(using_window and scanline - window_y or scroll_y + scanline, 0xff)
 
-  -- FIXME: the mask used here is arbitrary, but it works
   local tile_row = lshift(rshift(y_pos, 3), 5)
 
   -- draw each pixel
@@ -218,23 +217,24 @@ function graphics:render_tiles()
 
     local tile_location = tile_data + tile_num * 16
 
-    local line = mod(y_pos, 8) * 2
+    local line = band(y_pos, 0x07) * 2
 
     local data_right = memory:get(tile_location + line)
     local data_left = memory:get(tile_location + line + 1)
 
-    local color_bit = 7 - mod(x_pos, 8)
+    local color_bit = 7 - band(x_pos, 0x07)
 
-    -- combine data
-    local left_bit = rshift(band(lshift(1, color_bit), data_left), color_bit)
-    local right_bit = rshift(band(lshift(1, color_bit), data_right), color_bit)
+    local color_num = bor(
+      band(rshift(data_right, color_bit), 0x01),
+      band(rshift(data_left, color_bit), 0x01) * 2
+    )
 
-    local color_num = bor(lshift(left_bit, 1), right_bit)
-
-    local r, g, b = self:get_color(color_num, 0xff47)
+    local value = self:get_color(color_num, 1)
 
     if scanline >= 0 and scanline < 144 then
-      self.framebuffer:setPixel(pixel, scanline, r, g, b, 1)
+      self.bg_priority[pixel][scanline] = color_num ~= 0
+
+      pointer[pixel + scanline * 160] = value
     end
   end
 end
@@ -245,19 +245,38 @@ function graphics:render_sprites()
 
   local sprite_size = band(lcdc, 0x04) == 0x04 and 16 or 8
 
+  local sprites_to_draw = {}
+
   for sprite = 1, 40 do
-    local index = (sprite - 1) * 4
+    -- the oam scan selects up to 10 visible sprites
+    if #sprites_to_draw == 10 then
+      break
+    end
 
-    local y_pos = memory:get(OAM + index) - 16
-    local x_pos = memory:get(OAM + index + 1) - 8
+    local index = (sprite - 1) * 4 + OAM
 
-    local tile_location = memory:get(OAM + index + 2)
-    local attributes = memory:get(OAM + index + 3)
+    local y_pos = memory:get(index) - 16
+    local x_pos = memory:get(index + 1) - 8
+
+    if scanline >= y_pos and scanline < (y_pos + sprite_size) then
+      sprites_to_draw[#sprites_to_draw + 1] = { index, x_pos }
+    end
+  end
+
+  -- sort sprites by x_pos
+  table.sort(sprites_to_draw, sort_sprites)
+
+  for i = 1, #sprites_to_draw do
+    local index = sprites_to_draw[i][1]
+    local y_pos = memory:get(index) - 16
+    local x_pos = memory:get(index + 1) - 8
+    local tile_location = memory:get(index + 2)
+    local attributes = memory:get(index + 3)
 
     local y_flip = band(attributes, 0x40) == 0x40
     local x_flip = band(attributes, 0x20) == 0x20
 
-    local palette = band(attributes, 0x10) == 0x10 and 0xff49 or 0xff48
+    local palette = band(attributes, 0x10) == 0x10 and 3 or 2
 
     -- should sprite be drawn on this scanline
     if scanline >= y_pos and scanline < (y_pos + sprite_size) then
@@ -281,15 +300,21 @@ function graphics:render_sprites()
         end
 
         local color_num = bor(
-          lshift(rshift(band(lshift(1, color_bit), data_left), color_bit), 1),
-          rshift(band(lshift(1, color_bit), data_right), color_bit)
+          band(rshift(data_right, color_bit), 0x01),
+          band(rshift(data_left, color_bit), 0x01) * 2
         )
 
-        local r, g, b = self:get_color(color_num, palette)
+        local value = self:get_color(color_num, palette)
 
         local x = x_pos + (7 - tile_pixel)
         if color_num ~= 0 and x >= 0 and x < 160 and scanline >= 0 and scanline < 144 then
-          self.framebuffer:setPixel(x, scanline, r, g, b, 1)
+          -- check if sprite is behind bg
+          local bg_priority = band(attributes, 0x80) == 0x80
+          local is_bg = self.bg_priority[x][scanline]
+
+          if not bg_priority or not is_bg then
+            pointer[x + scanline * 160] = value
+          end
         end
       end
     end

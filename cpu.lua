@@ -94,22 +94,6 @@ function cpu:step()
 
   local bytes, cycles, handler, params = instr[3], instr[4], instr[5], instr[6]
 
-  if handler == nil then
-    print(
-      string.format(
-        "unknown instruction: 0x%02x, %s at PC:0x%04x",
-        cpu.opcode,
-        instr[2],
-        self.pc
-      )
-    )
-    os.exit(1)
-  end
-
-  if trace then
-    self:trace(instr)
-  end
-
   self.pc = band(self.pc + bytes, 0xffff)
 
   local extra_cycles = handler(params) or 0
@@ -171,65 +155,6 @@ function cpu:interrupt(interrupt)
   memory:set(0xFF0F, bor(interrupt_flag, interrupts[interrupt]))
 
   self.halt = false
-end
-
-function cpu:trace(instruction)
-  -- A:00 F:Z-H- BC:0000 DE:0393 HL:ffa8 SP:cfff PC:02f0
-  local z = band(cpu.f, 0x80) == 0x80 and "Z" or "-"
-  local s = band(cpu.f, 0x40) == 0x40 and "N" or "-"
-  local h = band(cpu.f, 0x20) == 0x20 and "H" or "-"
-  local c = band(cpu.f, 0x10) == 0x10 and "C" or "-"
-  local flags = z .. s .. h .. c
-
-  local data = ""
-
-  for i = 1, instruction[3] do
-    data = data .. string.format("%02x ", memory:get(self.pc + i - 1))
-  end
-
-  local opcode = memory:get(self.pc)
-  print(
-    string.format(
-      "A:%02X F:%s BC:%02X%02X DE:%02X%02X HL:%02X%02X SP:%04X PC:%04X (cy: %d) | %s [%s]",
-      cpu.a,
-      flags,
-      cpu.b,
-      cpu.c,
-      cpu.d,
-      cpu.e,
-      cpu.h,
-      cpu.l,
-      cpu.sp,
-      cpu.pc,
-      self.cycles,
-      instruction[2],
-      data
-    )
-  )
-end
-
-function cpu:trace_2()
-  -- format:
-  -- A:00 F:11 B:22 C:33 D:44 E:55 H:66 L:77 SP:8888 PC:9999 PCMEM:AA,BB,CC,DD
-  print(
-    string.format(
-      "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X",
-      cpu.a,
-      cpu.f,
-      cpu.b,
-      cpu.c,
-      cpu.d,
-      cpu.e,
-      cpu.h,
-      cpu.l,
-      cpu.sp,
-      cpu.pc,
-      memory:get(cpu.pc),
-      memory:get(cpu.pc + 1),
-      memory:get(cpu.pc + 2),
-      memory:get(cpu.pc + 3)
-    )
-  )
 end
 
 return cpu
