@@ -42,9 +42,8 @@ end
 -- colors are ABGR because it works with the ffi pointer
 local palettes = {
   { 0xfff4f4f4, 0xff866c56, 0xff573c33, 0xff2c1c1a, },
-  { 0xfff4f4f4, 0xff866c56, 0xff573c33, 0xff2c1c1a, },
-  { 0xfff4f4f4, 0xff866c56, 0xff573c33, 0xff2c1c1a, },
   { 0xfff4f4f4, 0xfff6a641, 0xffc95d3b, 0xff6f3629, },
+  { 0xfff4f4f4, 0xff75cdff, 0xff577def, 0xff533eb1, },
   { 0xfff4f4f4, 0xff75cdff, 0xff577def, 0xff533eb1, },
 }
 
@@ -52,6 +51,7 @@ local addresses = {
   0xff47,
   0xff48,
   0xff49,
+  0xff47,
 }
 
 function graphics:get_color(value, num)
@@ -253,7 +253,7 @@ function graphics:render_tiles()
       band(rshift(data_left, color_bit), 0x01) * 2
     )
 
-    local value = self:get_color(color_num, 1)
+    local value = self:get_color(color_num, using_window and 4 or 1)
 
     if scanline >= 0 and scanline < 144 then
       self.bg_priority[pixel][scanline] = color_num ~= 0
