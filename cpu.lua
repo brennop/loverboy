@@ -94,6 +94,8 @@ function cpu:step()
 
   local bytes, cycles, handler, params = instr[3], instr[4], instr[5], instr[6]
 
+  -- self:trace(instr)
+
   self.pc = band(self.pc + bytes, 0xffff)
 
   local extra_cycles = handler(params) or 0
@@ -106,11 +108,13 @@ end
 local interrupt_handlers = { 0x40, 0x48, 0x50, 0x58, 0x60 }
 
 function cpu:check_interrupts()
-  if self.ime then
-    local flags = memory:get(IF)
-    local interrupt = band(memory:get(IE), flags)
+  local flags = memory:get(IF)
+  local interrupt = band(memory:get(IE), flags)
 
-    if interrupt ~= 0 then
+  if interrupt ~= 0 then
+    self.halt = false
+
+    if self.ime then
       -- no nested interrupts
       self.ime = false
 
@@ -153,8 +157,41 @@ function cpu:interrupt(interrupt)
   local interrupt_flag = memory:get(0xFF0F)
 
   memory:set(0xFF0F, bor(interrupt_flag, interrupts[interrupt]))
+end
 
-  self.halt = false
+function cpu:trace(instruction)
+  -- A:00 F:Z-H- BC:0000 DE:0393 HL:ffa8 SP:cfff PC:02f0
+  local z = band(cpu.f, 0x80) == 0x80 and "Z" or "-"
+  local s = band(cpu.f, 0x40) == 0x40 and "N" or "-"
+  local h = band(cpu.f, 0x20) == 0x20 and "H" or "-"
+  local c = band(cpu.f, 0x10) == 0x10 and "C" or "-"
+  local flags = z .. s .. h .. c
+
+  local data = ""
+
+  for i = 1, instruction[3] do
+    data = data .. string.format("%02x ", memory:get(self.pc + i - 1))
+  end
+
+  local opcode = memory:get(self.pc)
+  print(
+    string.format(
+      "A:%02X F:%s BC:%02X%02X DE:%02X%02X HL:%02X%02X SP:%04X PC:%04X (cy: %d) | %s [%s]",
+      cpu.a,
+      flags,
+      cpu.b,
+      cpu.c,
+      cpu.d,
+      cpu.e,
+      cpu.h,
+      cpu.l,
+      cpu.sp,
+      cpu.pc,
+      self.cycles,
+      instruction[2],
+      data
+    )
+  )
 end
 
 return cpu
