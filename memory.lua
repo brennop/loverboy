@@ -29,6 +29,14 @@ local cartridge_types = {
   [0x1A] = "mbc5",
 }
 
+local bank_size = {
+  [0x00] = 0,
+  [0x02] = 1,
+  [0x03] = 4,
+  [0x04] = 16,
+  [0x05] = 8,
+}
+
 local mappers = {
   rom = {
     set = function(self, address, value)
@@ -66,34 +74,34 @@ local mappers = {
     set = function(self, address, value)
       local range = rshift(address, 12)
       if range < 0x02 then
-        self.ram_enable = band(value, 0x0A) == 0x0A
+        self.ram_enable = band(value, 0x0f) == 0x0A
       elseif range < 0x04 then
-        self.rom_bank = bor(band(self.rom_bank, 0x60), band(value, 0x1F))
+        self.rom_bank = math.max(1, band(value, 0x1f))
       elseif range < 0x06 then
-        value = band(value, 0x03) -- lower 2 bits
-        if self.bank_mode == "rom" then
-          -- set high bits (5-6) of rom_bank
-          self.rom_bank = bor(band(self.rom_bank, 0x1F), lshift(value, 5))
-        elseif self.bank_mode == "ram" then
-          -- ram_bank is 2 bits, just set it
-          self.ram_bank = value
-        end
+        self.ram_bank = band(value, 0x3)
       elseif range < 0x08 then
         if band(value, 0x01) == 0x01 then
           self.bank_mode = "ram"
         else
           self.bank_mode = "rom"
-          -- in rom banking mode, ram_bank is locked to 0
-          self.ram_bank = 0
         end
-      elseif range < 0xA then
+      elseif range < 0xA then -- 0x08, 0x09
         -- vram
-      elseif range < 0xC then
+      elseif range < 0xC then -- 0xA, 0xB
         if self.ram_enable then
-          self.banks[address - 0xA000 + self.ram_bank * 0x2000] = value
+          local addr = band(address, 0x1FFF)
+          if self.bank_mode == "ram" and self.ram_bank < self.ram_banks then
+            addr = bor(lshift(self.ram_bank, 13), addr)
+          end
+          self.banks[addr] = value
         end
+      elseif range < 0xE then -- 0xC, 0xD
+      elseif range < 0xF then -- 0xE
+        self.data[address - 0x2000] = value
       elseif range < 0x10 then
-        if address == 0xFF46 then
+        if address < 0xfe00 then
+          self.data[address - 0x2000] = value
+        elseif address == 0xFF46 then
           self:dma(value)
         end
       end
@@ -105,17 +113,29 @@ local mappers = {
       if range < 0x4 then
         return self.rom[address]
       elseif range < 0x8 then
-        return self.rom[address - 0x4000 + self.rom_bank * 0x4000]
+        local addr = bor(lshift(band(self.rom_bank, self.rom_banks - 1), 14), band(address, 0x3FFF))
+        return self.rom[addr]
       elseif range < 0xA then
       elseif range < 0xC then
         if self.ram_enable then
-          return self.banks[address - 0xA000 + self.ram_bank * 0x2000]
+          local addr = band(address, 0x1FFF)
+          if self.bank_mode == "ram" and self.ram_bank < self.ram_banks then
+            addr = bor(lshift(self.ram_bank, 13), addr)
+          end
+          return self.banks[addr]
+        else
+          return 0xff
         end
+      elseif range < 0xE then
+        -- wram
+      elseif range < 0xF then
+        return self.data[address - 0x2000]
       elseif range < 0x10 then
-        if address == 0xff00 then
+        if address < 0xfe00 then
+          return self.data[address - 0x2000]
+        elseif address == 0xff00 then
           return self:get_input()
-        end
-        if address == 0xff0f then
+        elseif address == 0xff0f then
           return self.data[address] + 0xe0
         end
       end
@@ -238,6 +258,8 @@ function memory:init(rom, save)
   self.ram_bank = 0
   self.ram_enable = false
   self.bank_mode = "rom"
+  self.ram_banks = bank_size[rom[0x149]]
+  self.rom_banks = lshift(1, rom[0x148] + 1)
 
   local cartridge_type = cartridge_types[rom[0x147]]
   local mapper = mappers[cartridge_type]
