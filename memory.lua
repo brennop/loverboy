@@ -273,9 +273,9 @@ function memory:init(rom, save)
 end
 
 function memory:dma(value)
-  local source = lshift(value, 8)
+  local source = 0x100 * math.min(value, 0xF1)
   for i = 0, 0x9F do
-    self.data[0xFE00 + i] = self.data[source + i]
+    self.data[0xFE00 + i] = self:get(source + i)
   end
 end
 
