@@ -25,6 +25,7 @@ local graphics = {
   mode = "hblank",
   framebuffer = nil,
   bg_priority = {},
+  window_line = 0,
 }
 
 local modes = {
@@ -35,11 +36,13 @@ local modes = {
 }
 
 local function sort_sprites(a, b)
-  return a[2] < b[2]
+  return a[2] > b[2]
 end
 
 -- colors are ABGR because it works with the ffi pointer
 local palettes = {
+  { 0xfff4f4f4, 0xff866c56, 0xff573c33, 0xff2c1c1a, },
+  { 0xfff4f4f4, 0xff866c56, 0xff573c33, 0xff2c1c1a, },
   { 0xfff4f4f4, 0xff866c56, 0xff573c33, 0xff2c1c1a, },
   { 0xfff4f4f4, 0xfff6a641, 0xffc95d3b, 0xff6f3629, },
   { 0xfff4f4f4, 0xff75cdff, 0xff577def, 0xff533eb1, },
@@ -135,6 +138,10 @@ function graphics:step(cycles)
         self.cycles = self.cycles - 204
         memory:set(LY, scanline + 1)
 
+        if self:is_window() then
+          self.window_line = self.window_line + 1
+        end
+
         if scanline == 143 then
           self:set_mode "vblank"
         else
@@ -150,6 +157,7 @@ function graphics:step(cycles)
         if scanline == 153 then
           self:set_mode "oam"
           memory:set(LY, 0)
+          self.window_line = 0
         end
       end
     end
@@ -158,6 +166,18 @@ end
 
 function graphics:is_lcd_enabled()
   return band(memory:get(LCDC), 0x80) == 0x80
+end
+
+function graphics:is_window()
+  local ly = memory:get(LY)
+  local wy = memory:get(WY)
+  local wx = memory:get(WX)
+  -- window enable && is visible
+  return band(memory:get(LCDC), 0x20) == 0x20 
+    and ly >= wy
+    and ly < wy + 144
+    and wx <= 166
+    and wy <= 143
 end
 
 function graphics:render_scanline()
@@ -191,10 +211,9 @@ function graphics:render_tiles()
   local tile_data = is_unsigned and 0x8000 or 0x8800
 
   -- which bg memory
-  local mask = using_window and 0x40 or 0x08
-  local background_memory = band(lcdc, mask) == mask and 0x9C00 or 0x9800
+  local background_memory = band(lcdc, 0x08) == 0x08 and 0x9C00 or 0x9800
 
-  local y_pos = band(using_window and scanline - window_y or scroll_y + scanline, 0xff)
+  local y_pos = band(scroll_y + scanline, 0xff)
 
   local tile_row = lshift(rshift(y_pos, 3), 5)
 
@@ -202,8 +221,13 @@ function graphics:render_tiles()
   for pixel = 0, 160 - 1 do
     local x_pos = pixel + scroll_x
 
+    local offset = 0
+
     if using_window and pixel >= window_x then
       x_pos = pixel - window_x
+      y_pos = scanline - window_y
+      tile_row = lshift(rshift(self.window_line - 1, 3), 5)
+      background_memory = band(lcdc, 0x40) == 0x40 and 0x9C00 or 0x9800
     end
 
     local tile_col = band(rshift(x_pos, 3), 0x1F)
@@ -215,7 +239,7 @@ function graphics:render_tiles()
       tile_num = tonumber(cast("int8_t", tile_num) + 128)
     end
 
-    local tile_location = tile_data + tile_num * 16
+    local tile_location = tile_data + tile_num * 16 + offset
 
     local line = band(y_pos, 0x07) * 2
 
@@ -272,6 +296,11 @@ function graphics:render_sprites()
     local x_pos = memory:get(index + 1) - 8
     local tile_location = memory:get(index + 2)
     local attributes = memory:get(index + 3)
+
+    -- Bit 0 of tile index for 8x16 objects should be ignored
+    if sprite_size == 16 then
+      tile_location = band(tile_location, 0xFE)
+    end
 
     local y_flip = band(attributes, 0x40) == 0x40
     local x_flip = band(attributes, 0x20) == 0x20
