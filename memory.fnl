@@ -64,7 +64,7 @@
 (fn memory.set [self address value]
   (let [range (r-shift address 12)]
     (if (< range 0x02)
-          (tset self :ram-enable (mask? value 0x0A))
+          (tset self :ram-enable (= (b-and value 0x0F) 0x0A))
         (< range 0x04)
           (match self.mapper
             :mbc1 (tset self :rom-bank (max 1 (b-and value 0x1F)))
@@ -83,10 +83,10 @@
           (tset self.data address value)
         (< range 0x0C)
           (if self.ram-enable
-            (let [addr (b-and address 0x1FFF)]
-              (match (values self.bank-mode (< self.ram-bank self.ram-banks))
-                (:ram true) (tset self.banks (b-or (l-shift self.ram-bank 13) addr) value)
-                _ (tset self.banks address value))))
+            (let [addr (if (and (= self.bank-mode :ram) (< self.ram-bank self.ram-banks))
+                           (b-or (l-shift self.ram-bank 13) (b-and address 0x1FFF))
+                           (b-and address 0x1FFF))]
+              (tset self :banks addr value)))
         (= address 0xff46)
           (: self :dma value))
       (tset self.data address value)))
