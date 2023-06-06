@@ -94,21 +94,7 @@ function cpu:step()
 
   local bytes, cycles, handler, params = instr[3], instr[4], instr[5], instr[6]
 
-  if handler == nil then
-    print(
-      string.format(
-        "unknown instruction: 0x%02x, %s at PC:0x%04x",
-        cpu.opcode,
-        instr[2],
-        self.pc
-      )
-    )
-    os.exit(1)
-  end
-
-  if trace then
-    self:trace(instr)
-  end
+  -- self:trace(instr)
 
   self.pc = band(self.pc + bytes, 0xffff)
 
@@ -122,11 +108,13 @@ end
 local interrupt_handlers = { 0x40, 0x48, 0x50, 0x58, 0x60 }
 
 function cpu:check_interrupts()
-  if self.ime then
-    local flags = memory:get(IF)
-    local interrupt = band(memory:get(IE), flags)
+  local flags = memory:get(IF)
+  local interrupt = band(memory:get(IE), flags)
 
-    if interrupt ~= 0 then
+  if interrupt ~= 0 then
+    self.halt = false
+
+    if self.ime then
       -- no nested interrupts
       self.ime = false
 
@@ -169,8 +157,6 @@ function cpu:interrupt(interrupt)
   local interrupt_flag = memory:get(0xFF0F)
 
   memory:set(0xFF0F, bor(interrupt_flag, interrupts[interrupt]))
-
-  self.halt = false
 end
 
 function cpu:trace(instruction)
@@ -204,30 +190,6 @@ function cpu:trace(instruction)
       self.cycles,
       instruction[2],
       data
-    )
-  )
-end
-
-function cpu:trace_2()
-  -- format:
-  -- A:00 F:11 B:22 C:33 D:44 E:55 H:66 L:77 SP:8888 PC:9999 PCMEM:AA,BB,CC,DD
-  print(
-    string.format(
-      "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X",
-      cpu.a,
-      cpu.f,
-      cpu.b,
-      cpu.c,
-      cpu.d,
-      cpu.e,
-      cpu.h,
-      cpu.l,
-      cpu.sp,
-      cpu.pc,
-      memory:get(cpu.pc),
-      memory:get(cpu.pc + 1),
-      memory:get(cpu.pc + 2),
-      memory:get(cpu.pc + 3)
     )
   )
 end

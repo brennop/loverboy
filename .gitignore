@@ -5,3 +5,6 @@ json.lua
 cpu_tests
 
 debugger.lua
+
+# debugging
+jit
