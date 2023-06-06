@@ -226,7 +226,8 @@ function graphics:render_tiles()
     if using_window and pixel >= window_x then
       x_pos = pixel - window_x
       y_pos = scanline - window_y
-      tile_row = lshift(rshift(self.window_line - 1, 3), 5)
+      -- TODO: use internal window line here
+      tile_row = lshift(rshift(y_pos, 3), 5)
       background_memory = band(lcdc, 0x40) == 0x40 and 0x9C00 or 0x9800
     end
 
