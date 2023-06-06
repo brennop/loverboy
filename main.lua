@@ -5,7 +5,7 @@ local graphics = require "graphics"
 
 function love.keypressed(key)
   if key == "escape" then
-    emulator:save_ram()
+    -- emulator:save_ram()
     love.event.quit()
   elseif key == "space" then
     emulator:toggle_boost()
