@@ -4,12 +4,15 @@
 (local boot (require :boot))
 
 (local {:rshift r-shift :lshift l-shift :band b-and :bnot b-not :bor b-or} bit)
+(local max (. math :max))
 (local down? (. love :keyboard :isDown))
 
 (local memory {:data nil
                :banks nil
                :rom-bank 1
                :ram-bank 0
+               :rom-banks 0
+               :ram-banks 0
                :ram-enable false
                :bank-mode :rom })
 
@@ -21,28 +24,39 @@
                         0x12 :mbc3
                         0x13 :mbc3})
 
+(local ram-banks {0x00 0
+                  0x02 1
+                  0x03 4
+                  0x04 16
+                  0x05 8})
+
 (fn memory.init [self rom]
     (tset self :rom rom)
     (tset self :mapper (. cartridge-types (. rom 0x147)))
+    (tset self :rom-banks (l-shift 1 (+ (. rom 0x148) 1)))
+    (tset self :ram-banks (. ram-banks (. rom 0x149)))
     (tset self :data (ffi.new "uint8_t[?]" 0x10000))
     (tset self :banks (ffi.new "uint8_t[?]" 0x8000))
     (each [key value (pairs boot)]
-      (tset self key value)))
+      (tset self :data key value)))
 
 (fn memory.get [self address]
   (let [range (r-shift address 12)]
     (if (< range 0x04) 
           (. self :rom address)
         (< range 0x08) 
-          (. self :rom (+ (- address 0x4000) (* self.rom-bank 0x4000)))
+          (. self :rom (b-or 
+                         (l-shift (b-and self.rom-bank (- self.rom-banks 1)) 14)
+                         (b-and address 0x3FFF)))
         (< range 0x0A)
           (. self :data address)
         (< range 0x0C)
-          (match self.mapper
-            "rom" (. self :rom address)
-            (where (or :mbc1 :mbc3) (. self :ram_enable))
-            (. self :rom (+ (- address 0xA000) (* self.ram-bank 0x2000)))
-            _ 0xff)
+          (if self.ram-enable
+              (let [addr (b-and address 0x1FFF)]
+                (match (values self.bank-mode (< self.ram-bank self.ram-banks))
+                  (:ram true) (. self :banks (b-or (l-shift self.ram-bank 13) addr))
+                  (_ _) (. self :banks addr)))
+              0xff)
         (= address 0xff00)
           (: self :input)
         (. self :data address))))
@@ -53,33 +67,29 @@
           (tset self :ram-enable (mask? value 0x0A))
         (< range 0x04)
           (match self.mapper
-            :mbc1 (tset self :rom-bank (b-or 
-                                         (b-and value 0x1F) 
-                                         (b-and self.rom-bank 0x60)))
+            :mbc1 (tset self :rom-bank (max 1 (b-and value 0x1F)))
             :mbc3 (tset self :rom-bank (b-and value 0x7F))
             _ nil)
         (< range 0x06)
-          (let [bank (b-and value 0x03)]
-            (match (values self.mapper self.bank-mode)
-              (:mbc1 :rom) (tset self :rom-bank (b-or (l-shift bank 5) (b-and self.rom-bank 0x1F)))
-              (:mbc1 :ram) (tset self :ram-bank bank)
-              :mbc3 (tset self :ram-bank value)))
+          (match (. self :mapper)
+            :mbc1 (tset self :ram-bank (b-and value 0x03))
+            :mbc3 (tset self :ram-bank value))
         (< range 0x08)
           (match self.mapper
             :mbc1 (if (mask? value 0x01) 
                        (tset self :bank-mode :ram)
-                       (do
-                         (tset self :bank-mode :rom)
-                         (tset self :ram-bank 0))))
+                       (tset self :bank-mode :rom)))
         (< range 0x0A)
           (tset self.data address value)
         (< range 0x0C)
-          (match self.mapper
-            :mbc1 (tset self :banks (+ (* self.ram-bank 0x2000) (- address 0xA000)) value)
-            :mbc3 (tset self :banks (+ (* self.ram-bank 0x2000) (- address 0xA000)) value))
+          (if self.ram-enable
+            (let [addr (b-and address 0x1FFF)]
+              (match (values self.bank-mode (< self.ram-bank self.ram-banks))
+                (:ram true) (tset self.banks (b-or (l-shift self.ram-bank 13) addr) value)
+                _ (tset self.banks address value))))
         (= address 0xff46)
-          (: self :dma value)
-      (tset self.data address value))))
+          (: self :dma value))
+      (tset self.data address value)))
 
 (fn memory.dma [self value]
   (let [source (l-shift value 8)]
