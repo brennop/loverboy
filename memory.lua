@@ -15,7 +15,7 @@ local memory = {
   bank_mode = "rom"
 }
 
-local cartridge_types = {
+local mappers = {
   [0x00] = "rom",
   [0x01] = "mbc1",
   [0x02] = "mbc1",
@@ -37,158 +37,95 @@ local bank_size = {
   [0x05] = 8,
 }
 
-local mappers = {
-  rom = {
-    set = function(self, address, value)
-      local range = rshift(address, 12)
-
-      if range < 0x04 then
-        return
-      elseif range < 0x08 then
-        -- TODO
-      elseif range < 0x10 then
-        if address == 0xff46 then
-          self:dma(value)
-        end
-      end
-
-      self.data[address] = value
-    end,
-    get = function(self, address)
-      local range = rshift(address, 12)
-
-      if range < 0x04 then
-        return self.rom[address]
-      elseif range < 0x08 then
-        return self.rom[address - 0x4000 + self.rom_bank * 0x4000]
-      elseif range < 0x10 then
-        if address == 0xff00 then
-          return self:get_input()
-        end
-      end
-
-      return self.data[address]
-    end
-  },
-  mbc1 = {
-    set = function(self, address, value)
-      local range = rshift(address, 12)
-      if range < 0x02 then
-        self.ram_enable = band(value, 0x0f) == 0x0A
-      elseif range < 0x04 then
-        self.rom_bank = math.max(1, band(value, 0x1f))
-      elseif range < 0x06 then
-        self.ram_bank = band(value, 0x3)
-      elseif range < 0x08 then
-        if band(value, 0x01) == 0x01 then
-          self.bank_mode = "ram"
-        else
-          self.bank_mode = "rom"
-        end
-      elseif range < 0xA then -- 0x08, 0x09
-        -- vram
-      elseif range < 0xC then -- 0xA, 0xB
-        if self.ram_enable then
-          local addr = band(address, 0x1FFF)
-          if self.bank_mode == "ram" and self.ram_bank < self.ram_banks then
-            addr = bor(lshift(self.ram_bank, 13), addr)
-          end
-          self.banks[addr] = value
-        end
-      elseif range < 0xE then -- 0xC, 0xD
-      elseif range < 0xF then -- 0xE
-        self.data[address - 0x2000] = value
-      elseif range < 0x10 then
-        if address < 0xfe00 then
-          self.data[address - 0x2000] = value
-        elseif address == 0xFF46 then
-          self:dma(value)
-        end
-      end
-
-      self.data[address] = value
-    end,
-    get = function(self, address)
-      local range = rshift(address, 12)
-      if range < 0x4 then
-        return self.rom[address]
-      elseif range < 0x8 then
-        local addr = bor(lshift(band(self.rom_bank, self.rom_banks - 1), 14), band(address, 0x3FFF))
-        return self.rom[addr]
-      elseif range < 0xA then
-      elseif range < 0xC then
-        if self.ram_enable then
-          local addr = band(address, 0x1FFF)
-          if self.bank_mode == "ram" and self.ram_bank < self.ram_banks then
-            addr = bor(lshift(self.ram_bank, 13), addr)
-          end
-          return self.banks[addr]
-        else
-          return 0xff
-        end
-      elseif range < 0xE then
-        -- wram
-      elseif range < 0xF then
-        return self.data[address - 0x2000]
-      elseif range < 0x10 then
-        if address < 0xfe00 then
-          return self.data[address - 0x2000]
-        elseif address == 0xff00 then
-          return self:get_input()
-        elseif address == 0xff0f then
-          return self.data[address] + 0xe0
-        end
-      end
-
-      return self.data[address]
-    end,
-  },
-  mbc3 = {
-    set = function (self, address, value)
-      local range = rshift(address, 12)
-      if range < 0x02 then
-        self.ram_enable = band(value, 0x0A) == 0x0A
-      elseif range < 0x04 then
-        self.rom_bank = max(band(value, 0x7F), 1)
-      elseif range < 0x06 then
-        self.ram_bank = value
-      elseif range < 0x08 then
-        -- rtc latch
-      elseif range < 0xA then
-        -- vram
-      elseif range < 0xC then
-        if self.ram_enable then
-          self.banks[address - 0xA000 + self.ram_bank * 0x2000] = value
-        end
-      elseif range < 0x10 then
-        if address == 0xFF46 then
-          self:dma(value)
-        end
-      end
-
-      self.data[address] = value
-    end,
-    get = function(self, address)
-      local range = rshift(address, 12)
-      if range < 0x4 then
-        return self.rom[address]
-      elseif range < 0x8 then
-        return self.rom[address - 0x4000 + self.rom_bank * 0x4000]
-      elseif range < 0xA then
-      elseif range < 0xC then
-        if self.ram_enable then
-          return self.banks[address - 0xA000 + self.ram_bank * 0x2000]
-        end
-      elseif range < 0x10 then
-        if address == 0xff00 then
-          return self:get_input()
-        end
-      end
-
-      return self.data[address]
-    end,
-  }
+local io_set = {
+  [0xff46]  = memory.dma,
 }
+
+local io_get = {
+  [0xff00] = memory.get_input,
+}
+
+function memory:get(address)
+  local range = rshift(address, 12)
+  if range < 0x4 then
+    return self.rom[address]
+  elseif range < 0x8 then
+    local addr = bor(lshift(band(self.rom_bank, self.rom_banks - 1), 14), band(address, 0x3FFF))
+    return self.rom[addr]
+  elseif range < 0xA then
+  elseif range < 0xC then
+    if self.ram_enable then
+      if self.mapper == "mbc1" then
+        local addr = band(address, 0x1FFF)
+        if self.bank_mode == "ram" and self.ram_bank < self.ram_banks then
+          addr = bor(lshift(self.ram_bank, 13), addr)
+        end
+        return self.banks[addr]
+      elseif self.mapper == "mbc3" then
+        return self.banks[address - 0xA000 + self.ram_bank * 0x2000]
+      end
+    else
+      return 0xff
+    end
+  elseif range < 0xE then
+    -- wram
+  elseif range < 0xF then
+    return self.data[address - 0x2000]
+  elseif range < 0x10 then
+    if address < 0xfe00 then
+      return self.data[address - 0x2000]
+    elseif address == 0xff00 then
+      return self:get_input()
+    elseif address == 0xff0f then
+      return self.data[address] + 0xe0
+    end
+  end
+
+  return self.data[address]
+end
+
+function memory:set(address, value)
+  local range = rshift(address, 12)
+  if range < 0x02 then
+    self.ram_enable = band(value, 0x0f) == 0x0A
+  elseif range < 0x04 then
+    local mask = ({ mbc1 = 0x1f, mbc3 = 0x7f })[self.mapper]
+    self.rom_bank = max(1, band(value, mask))
+  elseif range < 0x06 then
+    self.ram_bank = band(value, 0x3)
+  elseif range < 0x08 then
+    if band(value, 0x01) == 0x01 then
+      self.bank_mode = "ram"
+    else
+      self.bank_mode = "rom"
+    end
+  elseif range < 0xA then -- 0x08, 0x09
+    -- vram
+  elseif range < 0xC then -- 0xA, 0xB
+    if self.ram_enable then
+      if self.mapper == "mbc1" then
+        local addr = band(address, 0x1FFF)
+        if self.bank_mode == "ram" and self.ram_bank < self.ram_banks then
+          addr = bor(lshift(self.ram_bank, 13), addr)
+        end
+        self.banks[addr] = value
+      elseif self.mapper == "mbc3" then
+        self.banks[address - 0xA000 + self.ram_bank * 0x2000] = value
+      end
+    end
+  elseif range < 0xE then -- 0xC, 0xD
+  elseif range < 0xF then -- 0xE
+    self.data[address - 0x2000] = value
+  elseif range < 0x10 then
+    if address < 0xfe00 then
+      self.data[address - 0x2000] = value
+    elseif address == 0xFF46 then
+      self:dma(value)
+    end
+  end
+
+  self.data[address] = value
+end
 
 function memory:init(rom, save)
   self.rom = rom
@@ -199,6 +136,7 @@ function memory:init(rom, save)
     ffi.copy(self.banks, save, 0x8000)
   end
 
+  -- TODO: move to boot.lua
   -- https://gbdev.io/pandocs/Power_Up_Sequence.html#hardware-registers
   self.data[0xFF00] = 0xCF
   self.data[0xFF01] = 0x00
@@ -261,15 +199,11 @@ function memory:init(rom, save)
   self.ram_banks = bank_size[rom[0x149]]
   self.rom_banks = lshift(1, rom[0x148] + 1)
 
-  local cartridge_type = cartridge_types[rom[0x147]]
-  local mapper = mappers[cartridge_type]
+  self.mapper = mappers[rom[0x147]]
 
-  if mapper == nil then
+  if self.mapper == nil then
     error "unsupported cartridge type"
   end
-
-  self.get = mapper.get
-  self.set = mapper.set
 end
 
 function memory:dma(value)
