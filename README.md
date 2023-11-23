@@ -10,6 +10,12 @@ a game boy emulador made with löve
 - MBC1 and MBC3 (no rtc)
 - Game saves
 
+# running
+
+```
+love <path_to_loverboy> <path_to_rom>
+```
+
 # keymaps
 
 | Keyboard             | Emulator |
